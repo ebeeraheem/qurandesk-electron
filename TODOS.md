@@ -125,9 +125,15 @@ Legend: ✅ done · 🚧 in progress · ⬜ not started
 
 ## Phase 10 — Auto-updater
 
-- ⬜ `electron-updater` wired to GitHub Releases
-- ⬜ Check on launch and every 6 hours
-- ⬜ Update banner / restart prompt
+- ✅ `electron-updater@6` installed
+- ✅ `publish: github` in `electron-builder.yml` targets `ebeeraheem/qurandesk-electron`
+- ✅ `src/main/updater.ts` — wraps `autoUpdater`, normalises events into `UpdateStatus`. Auto-download on; auto-install-on-app-quit on (banner gives the user a "Restart now" shortcut; ignoring it still installs on next natural quit)
+- ✅ Initial check on launch + every 6h (`CHECK_INTERVAL_MS = 6 * 60 * 60 * 1000`)
+- ✅ Dev-mode short-circuit — `app.isPackaged` gate so unpacked dev builds report `up-to-date` rather than spamming errors
+- ✅ IPC: `checkForUpdates` + `installUpdateOnQuit` real (replaces Phase-1 stubs). `update:status` broadcast to all windows
+- ✅ Renderer `stores/updater.ts` mirrors status; `initUpdaterBridge` triggers an initial check
+- ✅ `UpdateBanner` — slim strip above the sidebar; hidden for `up-to-date` / `error` (errors surface in Settings instead). Renders downloading %, ready + Restart button
+- ✅ Settings → About → "Updates" row shows current status + manual "Check for updates" button. Becomes "Restart to install" when an update is ready
 
 ## Phase 11 — Packaging
 

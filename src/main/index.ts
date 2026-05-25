@@ -19,6 +19,7 @@ import * as downloader from './downloader'
 import { getStorageUsage } from './storage'
 import { getSettings, updateSettings } from './settings'
 import { getLastPlayback, setLastPlayback } from './playback'
+import * as updater from './updater'
 
 // Privileged scheme registration MUST happen before app is ready.
 registerProtocolScheme()
@@ -162,6 +163,10 @@ function registerIpcHandlers(): void {
   // Playback persistence.
   ipcMain.handle(IPC.getLastPlayback, async () => getLastPlayback())
   ipcMain.handle(IPC.setLastPlayback, async (_e, state: LastPlayback) => setLastPlayback(state))
+
+  // Auto-updater.
+  ipcMain.handle(IPC.checkForUpdates, async () => updater.checkForUpdates())
+  ipcMain.handle(IPC.installUpdateOnQuit, async () => updater.installUpdateOnQuit())
 }
 
 app.whenReady().then(async () => {
@@ -190,6 +195,10 @@ app.whenReady().then(async () => {
 
   // Boot the downloader: demote leftover 'active' rows + resume queue.
   downloader.recoverFromCrash()
+
+  // Auto-updater event fan-out + initial check. No-op in unpacked dev.
+  updater.onStatus((s) => broadcast(EVENTS.updateStatus, s))
+  updater.initUpdater()
 
   app.on('activate', function () {
     if (BrowserWindow.getAllWindows().length === 0) createWindow()

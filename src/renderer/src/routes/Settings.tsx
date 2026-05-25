@@ -6,6 +6,7 @@ import type {
   ThemePreference
 } from '@shared/api'
 import { useSettingsStore, updateSettings } from '../stores/settings'
+import { useUpdaterStore } from '../stores/updater'
 import { formatAbsoluteDate, formatRelativeTime } from '../utils/format'
 
 const THEMES: Array<{ value: ThemePreference; label: string }> = [
@@ -148,6 +149,7 @@ export default function Settings(): React.JSX.Element {
             <span className="font-mono text-xs text-muted">{appInfo?.version ?? '—'}</span>
           }
         />
+        <UpdateRow />
         <Row
           label="Library last updated"
           control={
@@ -165,6 +167,60 @@ export default function Settings(): React.JSX.Element {
         />
       </Section>
     </div>
+  )
+}
+
+function UpdateRow(): React.JSX.Element {
+  const status = useUpdaterStore((s) => s.status)
+  const [checking, setChecking] = useState(false)
+
+  const onCheck = async (): Promise<void> => {
+    setChecking(true)
+    try {
+      await window.api.checkForUpdates()
+    } finally {
+      setChecking(false)
+    }
+  }
+
+  const subtitle = (() => {
+    switch (status.status) {
+      case 'up-to-date':
+        return "You're on the latest version."
+      case 'available':
+        return `Version ${status.version} found — downloading…`
+      case 'downloading':
+        return `Downloading update… ${Math.round(status.percent)}%`
+      case 'ready':
+        return `Version ${status.version} is ready. Restart to install.`
+      case 'error':
+        return `Couldn't check for updates: ${status.message}`
+    }
+  })()
+
+  return (
+    <Row
+      label="Updates"
+      sub={subtitle}
+      control={
+        status.status === 'ready' ? (
+          <button
+            onClick={() => void window.api.installUpdateOnQuit()}
+            className="rounded-full bg-primary px-4 py-1.5 text-xs font-semibold text-white hover:opacity-90"
+          >
+            Restart to install
+          </button>
+        ) : (
+          <button
+            onClick={() => void onCheck()}
+            disabled={checking || status.status === 'downloading'}
+            className="rounded-full border border-border bg-bg-elev px-4 py-1.5 text-xs font-semibold text-muted hover:text-fg disabled:opacity-60"
+          >
+            {checking ? 'Checking…' : 'Check for updates'}
+          </button>
+        )
+      }
+    />
   )
 }
 

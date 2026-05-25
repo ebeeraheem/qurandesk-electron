@@ -40,5 +40,8 @@ appImage:
 npmRebuild: false
 publish:
   provider: github
-  # owner / repo fall back to the package.json `repository` field —
-  # set when the GitHub repo exists.
+  owner: ebeeraheem
+  repo: qurandesk-electron
+  # `electron-updater` reads latest.yml / latest-mac.yml / latest-linux.yml
+  # from the most recent (non-draft, non-prerelease) GitHub Release on this
+  # repo. `--publish always` on the build commands uploads them automatically.

@@ -2,10 +2,6 @@ import { contextBridge, ipcRenderer } from 'electron'
 import { electronAPI } from '@electron-toolkit/preload'
 import { IPC, type QuranDeskAPI } from '../shared/api'
 
-const notImplemented = (name: string) => async (): Promise<never> => {
-  throw new Error(`IPC handler not yet implemented: ${name}`)
-}
-
 const api: QuranDeskAPI = {
   getAppInfo: () => ipcRenderer.invoke(IPC.getAppInfo),
   ping: () => ipcRenderer.invoke(IPC.ping),
@@ -40,9 +36,9 @@ const api: QuranDeskAPI = {
   getLastPlayback: () => ipcRenderer.invoke(IPC.getLastPlayback),
   setLastPlayback: (state) => ipcRenderer.invoke(IPC.setLastPlayback, state),
 
-  // Stubs — populated by later phases.
-  checkForUpdates: notImplemented('checkForUpdates'),
-  installUpdateOnQuit: notImplemented('installUpdateOnQuit'),
+  // Auto-updater
+  checkForUpdates: () => ipcRenderer.invoke(IPC.checkForUpdates),
+  installUpdateOnQuit: () => ipcRenderer.invoke(IPC.installUpdateOnQuit),
 
   on: ((event: string, cb: (...args: unknown[]) => void) => {
     const listener = (_: Electron.IpcRendererEvent, ...args: unknown[]): void => cb(...args)

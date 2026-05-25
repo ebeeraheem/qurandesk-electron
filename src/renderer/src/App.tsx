@@ -9,6 +9,7 @@ import Downloads from './routes/Downloads'
 import Settings from './routes/Settings'
 import Welcome from './routes/Welcome'
 import NowPlaying from './routes/NowPlaying'
+import UpdateBanner from './components/UpdateBanner'
 
 type Gate =
   | { kind: 'checking' }
@@ -35,6 +36,7 @@ export default function App(): React.JSX.Element {
 
   return (
     <div className="flex h-full w-full flex-col bg-bg text-fg">
+      <UpdateBanner />
       <div className="flex min-h-0 flex-1">
         <Sidebar />
         <main className="min-w-0 flex-1 overflow-auto">
