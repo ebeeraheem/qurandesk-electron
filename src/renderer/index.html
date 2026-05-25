@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>QuranDesk</title>
+    <!--
+      CSP: in dev, electron-vite serves the renderer over http://localhost and needs
+      'unsafe-inline' style + ws: for HMR. In packaged builds the renderer is served from
+      file:// and 'self' covers it. The R2 host gets injected at build time and is allowed
+      for image (photos) and connect (manifest) sources.
+    -->
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; font-src 'self' data:; img-src 'self' data: https:; media-src 'self' app: blob:; connect-src 'self' https: ws:;"
+    />
+  </head>
+  <body class="bg-bg text-fg antialiased">
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

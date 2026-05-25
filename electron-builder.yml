@@ -1,0 +1,44 @@
+appId: app.qurandesk
+productName: QuranDesk
+directories:
+  buildResources: build
+files:
+  - '!**/.vscode/*'
+  - '!src/*'
+  - '!electron.vite.config.{js,ts,mjs,cjs}'
+  - '!{.eslintcache,eslint.config.mjs,.prettierignore,.prettierrc.yaml,dev-app-update.yml,CHANGELOG.md,README.md,TODOS.md}'
+  - '!{.env,.env.*,.npmrc,pnpm-lock.yaml}'
+  - '!{tsconfig.json,tsconfig.node.json,tsconfig.web.json}'
+asarUnpack:
+  - resources/**
+win:
+  executableName: QuranDesk
+  # Code-signing env vars (CSC_LINK, CSC_KEY_PASSWORD) wired but optional —
+  # v1 ships unsigned; SmartScreen warning clears with reputation or a cert.
+nsis:
+  artifactName: ${name}-${version}-setup.${ext}
+  shortcutName: ${productName}
+  uninstallDisplayName: ${productName}
+  createDesktopShortcut: always
+mac:
+  category: public.app-category.music
+  entitlementsInherit: build/entitlements.mac.plist
+  # Universal binary built when packaging: --arch universal
+  notarize: false
+  extendInfo:
+    - NSDocumentsFolderUsageDescription: QuranDesk needs access to manage downloaded recitations.
+dmg:
+  artifactName: ${name}-${version}.${ext}
+linux:
+  target:
+    - AppImage
+    - deb
+  maintainer: qurandesk.app
+  category: AudioVideo
+appImage:
+  artifactName: ${name}-${version}.${ext}
+npmRebuild: false
+publish:
+  provider: github
+  # owner / repo fall back to the package.json `repository` field —
+  # set when the GitHub repo exists.

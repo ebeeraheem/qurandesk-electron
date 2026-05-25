@@ -1,0 +1,88 @@
+@import 'tailwindcss';
+
+/* Manual class-based dark mode — toggled by setting `.dark` on <html>. */
+@custom-variant dark (&:where(.dark, .dark *));
+
+@theme {
+  /* Surfaces & ink — light defaults; .dark overrides below replace these vars. */
+  --color-bg: #ffffff;
+  --color-sidebar: #faf8fd;
+  --color-bg-elev: rgba(18, 25, 49, 0.05);
+  --color-bg-tint: #f5effb;
+  --color-fg: #240f4f;
+  --color-muted: #8789a3;
+  --color-faint: #bbc4ce;
+  --color-border: rgba(187, 196, 206, 0.55);
+
+  /* Primary purple — `primary` switches between #863ED5 (light) and #A44AFF (dark) */
+  --color-primary: #863ed5;
+  --color-primary-deep: #672cbc; /* Reserved for the wordmark */
+  --color-primary-soft: #994ef8;
+  --color-primary-bright: #a44aff;
+
+  /* Semantic — used sparingly */
+  --color-success: #01ab14;
+  --color-warning: #f5b304;
+  --color-danger: #c12940;
+  --color-warm: #f98091;
+
+  /* Type stack — Apple-first, Segoe UI fallback for Windows */
+  --font-sans:
+    -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+  --font-arabic:
+    'Amiri', 'Geeza Pro', 'Traditional Arabic', 'Segoe UI', serif;
+}
+
+/* Dark theme — overrides the @theme variables when html.dark is set. */
+.dark {
+  --color-bg: #040c23;
+  --color-sidebar: #081027;
+  --color-bg-elev: #121931;
+  --color-bg-tint: rgba(164, 74, 255, 0.08);
+  --color-fg: #ffffff;
+  --color-muted: #a19cc5;
+  --color-faint: #7b80ad;
+  --color-border: rgba(123, 128, 173, 0.18);
+  --color-primary: #a44aff;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  background: var(--color-bg);
+  color: var(--color-fg);
+  font-family: var(--font-sans);
+  overflow: hidden;
+}
+
+/* Region the renderer can drag to move the window. */
+.app-drag {
+  -webkit-app-region: drag;
+}
+
+.app-no-drag {
+  -webkit-app-region: no-drag;
+}
+
+/* Scrollbar — subtle, theme-aware. */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--color-faint);
+  border-radius: 6px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--color-muted);
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
