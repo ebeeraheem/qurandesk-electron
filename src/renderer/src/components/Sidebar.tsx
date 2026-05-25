@@ -1,7 +1,6 @@
 import { NavLink } from 'react-router-dom'
 import logo from '../assets/logo.svg'
 import { useDownloadsStore } from '../stores/downloads'
-import SidebarStorage from './SidebarStorage'
 
 type NavItem = {
   to: string
@@ -91,9 +90,6 @@ export default function Sidebar(): React.JSX.Element {
         })}
       </nav>
 
-      <div className="app-no-drag mt-auto">
-        <SidebarStorage />
-      </div>
     </aside>
   )
 }

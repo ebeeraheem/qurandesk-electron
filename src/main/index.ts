@@ -1,4 +1,5 @@
 import { app, shell, BrowserWindow, ipcMain } from 'electron'
+import type { Settings, LastPlayback } from '../shared/api'
 import { join } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import icon from '../../resources/icon.png?asset'
@@ -18,7 +19,6 @@ import * as downloader from './downloader'
 import { getStorageUsage } from './storage'
 import { getSettings, updateSettings } from './settings'
 import { getLastPlayback, setLastPlayback } from './playback'
-import type { LastPlayback, Settings } from '../shared/api'
 
 // Privileged scheme registration MUST happen before app is ready.
 registerProtocolScheme()
@@ -147,6 +147,12 @@ function registerIpcHandlers(): void {
   // Storage.
   ipcMain.handle(IPC.getStorageUsage, async () => {
     return getStorageUsage()
+  })
+  ipcMain.handle(IPC.revealDownloadsFolder, async () => {
+    // No renderer-provided path — we always open the audio root we control.
+    // Avoids any chance of arbitrary-path opens via this IPC.
+    const dir = getAudioRoot()
+    if (dir) await shell.openPath(dir)
   })
 
   // Settings.

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
-import type { QueueEntry, ReciterSummary } from '@shared/api'
+import type { QueueEntry, ReciterSummary, StorageUsage } from '@shared/api'
 import { getSurah } from '@shared/surahs'
 import ReciterAvatar from '../components/ReciterAvatar'
 import { useDownloadsStore } from '../stores/downloads'
@@ -10,9 +10,15 @@ export default function Downloads(): React.JSX.Element {
   const queue = useDownloadsStore((s) => s.queue)
   const paused = useDownloadsStore((s) => s.paused)
   const [reciters, setReciters] = useState<ReciterSummary[]>([])
+  const [usage, setUsage] = useState<StorageUsage | null>(null)
 
   const reload = async (): Promise<void> => {
-    setReciters(await window.api.getReciters())
+    const [list, u] = await Promise.all([
+      window.api.getReciters(),
+      window.api.getStorageUsage().catch(() => null)
+    ])
+    setReciters(list)
+    setUsage(u)
   }
 
   useEffect(() => {
@@ -56,9 +62,13 @@ export default function Downloads(): React.JSX.Element {
         <div>
           <h1 className="text-3xl font-bold">Downloads</h1>
           <p className="mt-1 text-sm text-muted">
-            {activeOrQueuedCount > 0
-              ? `${activeOrQueuedCount} in progress`
-              : 'No active downloads'}
+            <span className="font-semibold text-fg">
+              {usage ? formatBytes(usage.appUsedBytes) : '—'}
+            </span>{' '}
+            used by QuranDesk
+            {activeOrQueuedCount > 0 && (
+              <span className="ml-2">· {activeOrQueuedCount} in progress</span>
+            )}
             {failedEntries.length > 0 && (
               <span className="ml-2 text-danger">· {failedEntries.length} failed</span>
             )}

@@ -1,61 +1,244 @@
-import { useThemeStore } from '../stores/theme'
-import type { ThemePreference } from '@shared/api'
+import { useEffect, useState } from 'react'
+import type {
+  AppInfo,
+  AutoAdvanceMode,
+  PlaybackSpeed,
+  ThemePreference
+} from '@shared/api'
+import { useSettingsStore, updateSettings } from '../stores/settings'
+import { formatAbsoluteDate, formatRelativeTime } from '../utils/format'
+
+const THEMES: Array<{ value: ThemePreference; label: string }> = [
+  { value: 'system', label: 'System' },
+  { value: 'light', label: 'Light' },
+  { value: 'dark', label: 'Dark' }
+]
+
+const SPEEDS: PlaybackSpeed[] = [0.75, 1.0, 1.25, 1.5]
+
+const AUTO_ADVANCE: Array<{ value: AutoAdvanceMode; label: string; sub: string }> = [
+  {
+    value: 'stop',
+    label: 'Stop',
+    sub: 'Stay offline. Pause when the next surah isn’t on disk.'
+  },
+  {
+    value: 'download-then-play',
+    label: 'Download then play',
+    sub: 'Fetch the missing surah, then continue.'
+  }
+]
 
 export default function Settings(): React.JSX.Element {
-  const { preference, setPreference } = useThemeStore()
-  const options: ThemePreference[] = ['system', 'light', 'dark']
+  const settings = useSettingsStore((s) => s.settings)
+  const [appInfo, setAppInfo] = useState<AppInfo | null>(null)
+  const [manifestStatus, setManifestStatus] = useState<{
+    cachedAt: number | null
+    lastError: string | null
+  }>({ cachedAt: null, lastError: null })
+  const [refreshing, setRefreshing] = useState(false)
+
+  useEffect(() => {
+    void window.api.getAppInfo().then(setAppInfo).catch(() => undefined)
+    void window.api.getManifestStatus().then(setManifestStatus)
+    const off = window.api.on('manifest:updated', () => {
+      void window.api.getManifestStatus().then(setManifestStatus)
+    })
+    return off
+  }, [])
+
+  const onRefresh = async (): Promise<void> => {
+    setRefreshing(true)
+    try {
+      await window.api.refreshManifest()
+    } finally {
+      setRefreshing(false)
+    }
+  }
 
   return (
     <div className="px-10 py-8">
-      <div className="app-drag pb-4">
+      <header className="app-drag pb-6">
         <h1 className="text-3xl font-bold">Settings</h1>
-      </div>
+      </header>
 
-      <section className="mt-6">
-        <div className="mb-2 text-[10px] font-semibold tracking-widest text-faint">APPEARANCE</div>
-        <div className="rounded-xl border border-border bg-bg-elev px-5 py-4">
-          <div className="flex items-center justify-between gap-4">
-            <div>
-              <div className="font-semibold">Theme</div>
-              <div className="text-sm text-muted">
-                System follows your OS preference. Defaults to your operating system on first launch.
-              </div>
+      <Section title="Appearance">
+        <Row
+          label="Theme"
+          sub="System follows your operating system."
+          control={
+            <SegmentedControl
+              options={THEMES}
+              value={settings.theme}
+              onChange={(v) => void updateSettings({ theme: v })}
+            />
+          }
+        />
+      </Section>
+
+      <Section title="Playback">
+        <Row
+          label="Default playback speed"
+          sub="Used the next time you start a recitation."
+          control={
+            <SegmentedControl
+              options={SPEEDS.map((s) => ({
+                value: s,
+                label: `${s.toFixed(2).replace(/\.?0+$/, '')}×`
+              }))}
+              value={settings.defaultPlaybackSpeed}
+              onChange={(v) => void updateSettings({ defaultPlaybackSpeed: v })}
+            />
+          }
+        />
+        <Row
+          label="When the next surah isn’t downloaded"
+          sub="Behaviour during sequential play when a surah hasn’t been downloaded yet."
+          control={
+            <SegmentedControl
+              options={AUTO_ADVANCE.map((o) => ({ value: o.value, label: o.label }))}
+              value={settings.autoAdvanceMode}
+              onChange={(v) => void updateSettings({ autoAdvanceMode: v })}
+            />
+          }
+        />
+      </Section>
+
+      <Section title="Storage">
+        <Row
+          label="Downloads folder"
+          sub="Audio files for offline playback."
+          control={
+            <div className="flex items-center gap-2">
+              <code className="max-w-[260px] truncate rounded-md bg-bg-elev px-3 py-1.5 font-mono text-xs text-muted" title={appInfo?.audioDir}>
+                {appInfo?.audioDir ?? '—'}
+              </code>
+              <button
+                onClick={() => void window.api.revealDownloadsFolder()}
+                className="rounded-md border border-border bg-bg-elev px-3 py-1.5 text-xs font-semibold text-muted hover:text-fg"
+              >
+                Show in Explorer
+              </button>
             </div>
-            <div className="flex rounded-full bg-bg p-1">
-              {options.map((opt) => (
-                <button
-                  key={opt}
-                  onClick={() => setPreference(opt)}
-                  className={[
-                    'rounded-full px-3 py-1.5 text-xs font-semibold capitalize transition-colors',
-                    preference === opt
-                      ? 'bg-primary text-white'
-                      : 'text-muted hover:text-fg'
-                  ].join(' ')}
-                >
-                  {opt}
-                </button>
-              ))}
-            </div>
-          </div>
-        </div>
-      </section>
+          }
+        />
+        <Row
+          label="Refresh library"
+          sub={
+            manifestStatus.lastError
+              ? `Last refresh failed: ${manifestStatus.lastError}`
+              : `Check for newly added reciters.`
+          }
+          control={
+            <button
+              onClick={() => void onRefresh()}
+              disabled={refreshing}
+              className="rounded-full bg-primary px-4 py-1.5 text-xs font-semibold text-white hover:opacity-90 disabled:opacity-60"
+            >
+              {refreshing ? 'Refreshing…' : 'Refresh now'}
+            </button>
+          }
+        />
+      </Section>
 
-      <section className="mt-6">
-        <div className="mb-2 text-[10px] font-semibold tracking-widest text-faint">PLAYBACK</div>
-        <div className="rounded-xl border border-border bg-bg-elev px-5 py-4 text-sm text-muted">
-          Playback settings (default reciter, default speed, auto-advance behaviour) land here in
-          the settings phase.
-        </div>
-      </section>
-
-      <section className="mt-6">
-        <div className="mb-2 text-[10px] font-semibold tracking-widest text-faint">STORAGE</div>
-        <div className="rounded-xl border border-border bg-bg-elev px-5 py-4 text-sm text-muted">
-          Downloads folder and library refresh land here once the manifest + downloader phases are
-          complete.
-        </div>
-      </section>
+      <Section title="About">
+        <Row
+          label="Version"
+          control={
+            <span className="font-mono text-xs text-muted">{appInfo?.version ?? '—'}</span>
+          }
+        />
+        <Row
+          label="Library last updated"
+          control={
+            <span className="text-xs text-muted">
+              {manifestStatus.cachedAt ? (
+                <>
+                  {formatAbsoluteDate(new Date(manifestStatus.cachedAt).toISOString())}
+                  <span className="ml-2 text-faint">({formatRelativeTime(manifestStatus.cachedAt)})</span>
+                </>
+              ) : (
+                '—'
+              )}
+            </span>
+          }
+        />
+      </Section>
     </div>
   )
 }
+
+// ---------------------------------------------------------------------------
+// Building blocks
+// ---------------------------------------------------------------------------
+
+function Section({
+  title,
+  children
+}: {
+  title: string
+  children: React.ReactNode
+}): React.JSX.Element {
+  return (
+    <section className="mt-6">
+      <div className="mb-2 text-[10px] font-semibold uppercase tracking-widest text-faint">
+        {title}
+      </div>
+      <div className="divide-y divide-border rounded-xl border border-border bg-bg-elev">
+        {children}
+      </div>
+    </section>
+  )
+}
+
+function Row({
+  label,
+  sub,
+  control
+}: {
+  label: string
+  sub?: string
+  control: React.ReactNode
+}): React.JSX.Element {
+  return (
+    <div className="flex items-center justify-between gap-6 px-5 py-4">
+      <div className="min-w-0">
+        <div className="font-semibold text-fg">{label}</div>
+        {sub && <div className="mt-0.5 text-xs text-muted">{sub}</div>}
+      </div>
+      <div className="shrink-0">{control}</div>
+    </div>
+  )
+}
+
+function SegmentedControl<T extends string | number>({
+  options,
+  value,
+  onChange
+}: {
+  options: Array<{ value: T; label: string }>
+  value: T
+  onChange: (v: T) => void
+}): React.JSX.Element {
+  return (
+    <div className="flex rounded-full bg-bg p-1">
+      {options.map((opt) => {
+        const active = opt.value === value
+        return (
+          <button
+            key={String(opt.value)}
+            onClick={() => onChange(opt.value)}
+            className={[
+              'rounded-full px-3 py-1.5 text-xs font-semibold transition-colors',
+              active ? 'bg-primary text-white shadow-sm' : 'text-muted hover:text-fg'
+            ].join(' ')}
+            aria-pressed={active}
+          >
+            {opt.label}
+          </button>
+        )
+      })}
+    </div>
+  )
+}
+

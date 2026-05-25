@@ -111,10 +111,17 @@ Legend: ✅ done · 🚧 in progress · ⬜ not started
 
 ## Phase 9 — Settings & storage
 
-- ⬜ Theme, default reciter, default playback speed, auto-advance mode
-- ⬜ Storage block in sidebar (app used / total device, with "other apps" tooltip)
-- ⬜ Downloads folder displayed read-only with "Show in Finder/Explorer"
-- ⬜ "Refresh library" button calling `refreshManifest`
+- ✅ Settings page UI — Appearance / Playback / Storage / About sections
+  - Theme: System / Light / Dark segmented control (writes through `updateSettings`). **Sole control surface** — PlayerBar theme button removed since the Settings page covers it
+  - Default playback speed: 0.75× / 1× / 1.25× / 1.5×
+  - "When the next surah isn't downloaded": Stop / Download then play (the `autoAdvanceMode` toggle)
+  - Downloads folder: read-only path + Show in Explorer
+  - Refresh library: calls `refreshManifest`. Subtitle reads "Check for newly added reciters." (was "Re-download reciters.json from cloud storage" — too technical); on failure surfaces the error
+  - About: version + library-last-updated date
+- ✅ Theme refactored to be settings-derived — `localStorage` only as first-paint cache; `useSettingsStore` is the source of truth
+- ✅ `revealDownloadsFolder` IPC (`shell.openPath` on the audio root; no renderer-provided path → no traversal surface)
+- ✅ Sidebar storage block was already wired in Phase 7 (kept as-is)
+- ❌ Default reciter — removed per user feedback (not useful enough to justify the row + the on-launch redirect complexity)
 
 ## Phase 10 — Auto-updater
 

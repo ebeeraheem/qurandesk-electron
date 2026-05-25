@@ -1,5 +1,4 @@
 import { useNavigate } from 'react-router-dom'
-import { useThemeStore } from '../stores/theme'
 import { usePlayerStore } from '../stores/player'
 import { useSettingsStore } from '../stores/settings'
 import {
@@ -181,7 +180,7 @@ export default function PlayerBar(): React.JSX.Element {
         )}
       </div>
 
-      <ThemeAndExpand hasTrack={hasTrack} />
+      <ExpandButton hasTrack={hasTrack} />
     </footer>
   )
 }
@@ -244,50 +243,10 @@ export function RepeatIcon({
   )
 }
 
-function ThemeAndExpand({ hasTrack }: { hasTrack: boolean }): React.JSX.Element {
+function ExpandButton({ hasTrack }: { hasTrack: boolean }): React.JSX.Element {
   const navigate = useNavigate()
-  const { active, preference, setPreference } = useThemeStore()
-
-  const cycleTheme = (): void => {
-    const order: Array<'system' | 'light' | 'dark'> = ['system', 'light', 'dark']
-    const next = order[(order.indexOf(preference) + 1) % order.length]
-    setPreference(next)
-  }
-
   return (
     <div className="flex shrink-0 items-center gap-2 text-muted">
-      <button
-        onClick={cycleTheme}
-        title={`Theme: ${preference} (active: ${active})`}
-        className="rounded-full p-2 hover:bg-bg-elev hover:text-fg"
-        aria-label="Cycle theme"
-      >
-        {active === 'dark' ? (
-          <svg
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="1.8"
-            className="size-4"
-          >
-            <circle cx="12" cy="12" r="4" />
-            <path
-              d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"
-              strokeLinecap="round"
-            />
-          </svg>
-        ) : (
-          <svg
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="1.8"
-            className="size-4"
-          >
-            <path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8Z" />
-          </svg>
-        )}
-      </button>
       <button
         onClick={() => hasTrack && navigate('/now-playing')}
         disabled={!hasTrack}

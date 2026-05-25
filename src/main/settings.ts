@@ -31,10 +31,6 @@ export function getSettings(): Settings {
     theme: VALID_THEME.has(stored.theme as string)
       ? (stored.theme as Settings['theme'])
       : DEFAULT_SETTINGS.theme,
-    defaultReciterId:
-      typeof stored.defaultReciterId === 'string' || stored.defaultReciterId === null
-        ? (stored.defaultReciterId as string | null)
-        : DEFAULT_SETTINGS.defaultReciterId,
     defaultPlaybackSpeed: VALID_SPEED.has(stored.defaultPlaybackSpeed as number)
       ? (stored.defaultPlaybackSpeed as Settings['defaultPlaybackSpeed'])
       : DEFAULT_SETTINGS.defaultPlaybackSpeed,
@@ -51,11 +47,6 @@ export function updateSettings(patch: Partial<Settings>): Settings {
   // Validate inputs at the boundary so a misbehaving renderer can't poison the table.
   const safe: Partial<Settings> = {}
   if (patch.theme !== undefined && VALID_THEME.has(patch.theme)) safe.theme = patch.theme
-  if (patch.defaultReciterId !== undefined) {
-    if (typeof patch.defaultReciterId === 'string' || patch.defaultReciterId === null) {
-      safe.defaultReciterId = patch.defaultReciterId
-    }
-  }
   if (patch.defaultPlaybackSpeed !== undefined && VALID_SPEED.has(patch.defaultPlaybackSpeed)) {
     safe.defaultPlaybackSpeed = patch.defaultPlaybackSpeed
   }

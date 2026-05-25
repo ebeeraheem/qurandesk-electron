@@ -37,7 +37,6 @@ export type RepeatMode = 'off' | 'one'
 
 export type Settings = {
   theme: ThemePreference
-  defaultReciterId: string | null
   defaultPlaybackSpeed: PlaybackSpeed
   repeatMode: RepeatMode
   /** What to do when the next surah isn't on disk. */
@@ -112,6 +111,8 @@ export interface QuranDeskAPI {
 
   // Storage
   getStorageUsage: () => Promise<StorageUsage>
+  /** Open the downloads folder in the OS file explorer. */
+  revealDownloadsFolder: () => Promise<void>
 
   // Settings
   getSettings: () => Promise<Settings>
@@ -166,6 +167,7 @@ export const IPC = {
   isPaused: 'download:isPaused',
 
   getStorageUsage: 'storage:getUsage',
+  revealDownloadsFolder: 'storage:revealFolder',
 
   getSettings: 'settings:get',
   updateSettings: 'settings:update',
@@ -178,7 +180,6 @@ export const IPC = {
 
 export const DEFAULT_SETTINGS: Settings = {
   theme: 'system',
-  defaultReciterId: null,
   defaultPlaybackSpeed: 1.0,
   repeatMode: 'off',
   autoAdvanceMode: 'stop'
