@@ -64,17 +64,35 @@ Legend: ✅ done · 🚧 in progress · ⬜ not started
 
 ## Phase 6 — Single-surah downloader
 
-- ⬜ SQLite via `better-sqlite3` (`downloads`, `download_queue`, `manifest_cache` tables)
-- ⬜ `src/main/downloader.ts` — streamed fetch → `.partial` → rename, with progress events
-- ⬜ Exponential backoff 1 / 4 / 16 s, then `failed`
-- ⬜ Queue persistence across restarts (`active` → `queued` on boot, then resume)
-- ⬜ Progress events throttled to ~2/sec per download
+- ✅ SQLite via `better-sqlite3@12` (`downloads`, `download_queue` tables — WAL mode, indexes). `manifest_cache` left as JSON file (see open items)
+- ✅ `src/main/downloader.ts` — worker pool (MAX_CONCURRENT=3), streamed `fetch` → `<file>.partial` → atomic rename
+- ✅ Exponential backoff 1s / 4s / 16s, then `'failed'` with error message
+- ✅ Cancel: AbortController per job, deletes queue row + `.partial` file
+- ✅ Queue persistence across restarts (`recoverFromCrash` demotes `'active'`/`'paused'` → `'queued'` on boot, then resumes)
+- ✅ Progress events throttled to 500ms per active download (~2/sec)
+- ✅ `pauseAll` / `resumeAll` — process-wide flag prevents new starts; in-flight finish normally
+- ✅ Filesystem reconciliation on boot — pre-existing audio files get INSERTed into `downloads` so they appear in the UI
+- ✅ All IPC validations (reciter-id regex, surah range) enforced at the handler boundary per spec §8
+- ✅ Renderer downloads store (`stores/downloads.ts`) — per-reciter map hydrated lazily, kept live via `download:progress` / `download:completed`
+- ✅ `SurahRow` renders all states: download / queued / active (with progress %) / failed (with retry) / downloaded (with play|pause)
+- ✅ Active rows show a subtle gradient progress fill across the row
+- ✅ `Download all 114` / `Resume · X left` / `Downloading N…` aggregate button on reciter detail (now functional)
+- ✅ Full Downloads page: per-reciter active card with progress bar + current surah + cancel-all, Failed list with retry/remove, Fully Downloaded list with delete, Partial list, Pause all / Resume all
+- ✅ Sidebar badge: live count of queued + active + failed entries
+
+### Caveats discovered during build
+
+- `better-sqlite3@11` failed to compile against Electron 39's V8 (removed `Context::GetIsolate`). Bumped to `v12.10.0` which builds cleanly. If a contributor's local install ever needs to rebuild for a different Electron ABI (you'll see `The module ... was compiled against a different Node.js version`), run `npx @electron/rebuild -f -w better-sqlite3`.
 
 ## Phase 7 — Batch download
 
-- ⬜ "Download all 114" enqueues missing surahs
-- ⬜ Pre-flight free-disk check (`total_size_bytes > freeDisk - 1 GB` blocks with friendly error)
-- ⬜ Per-reciter aggregate state recomputation (`none` / `partial` / `complete`)
+- ✅ "Download all 114" enqueues missing surahs (shipped in Phase 6; preserved here)
+- ✅ Per-reciter aggregate state recomputation (shipped in Phase 6 via `getReciterStats`)
+- ✅ `src/main/storage.ts` — `getStorageUsage()` via `fsp.statfs` + SQL `SUM(size_bytes)`; wired through `getStorageUsage` IPC
+- ✅ `ConfirmDownloadDialog` with three states: **ok** (plain readout + Download CTA), **tight** (within 5 GB safety amber warning, still proceedable), **insufficient** (within 1 GB margin → blocking red error, Cancel only)
+- ✅ Aggregate header button now opens the dialog instead of enqueuing directly; estimate computed as `total_size_bytes × (114 − downloaded) / 114` since manifest lacks per-surah sizes
+- ✅ Sidebar storage block now shows real numbers — primary slice = QuranDesk, muted slice = other apps; tooltip breaks down used / free / total
+- ✅ Storage updates on `download:completed` events + 30s sanity poll
 
 ## Phase 8 — Player
 
@@ -119,3 +137,4 @@ Legend: ✅ done · 🚧 in progress · ⬜ not started
 - Release channels — stable only in v1
 - Production `MAIN_VITE_MANIFEST_URL` / `VITE_R2_HOST` — to be filled in once R2 base URL is provided
 - **Manifest extension** — add `name_ar` (Arabic short form) per reciter so card placeholders match the design language. Currently we fall back to the first English letter.
+- **Manifest cache in SQLite** — spec §3.3 has a `manifest_cache` table; we kept Phase 3's JSON-file cache instead because both work and migration would touch a stable module. Consolidate once we have a reason.

@@ -46,6 +46,20 @@ export type StorageUsage = {
   downloadDir: string
 }
 
+/**
+ * Flat row from `download_queue` — used by the Downloads page to render
+ * everything that's not yet a completed download.
+ */
+export type QueueEntry = {
+  reciterId: string
+  surahNumber: number
+  status: 'queued' | 'active' | 'paused' | 'failed'
+  progressBytes: number
+  totalBytes: number
+  error: string | null
+  createdAt: number
+}
+
 export type AppInfo = {
   version: string
   platform: NodeJS.Platform
@@ -75,6 +89,8 @@ export interface QuranDeskAPI {
   resumeAll: () => Promise<void>
   deleteReciter: (reciterId: string) => Promise<void>
   deleteSurah: (reciterId: string, surah: number) => Promise<void>
+  getActiveQueue: () => Promise<QueueEntry[]>
+  isPaused: () => Promise<boolean>
 
   // Storage
   getStorageUsage: () => Promise<StorageUsage>
@@ -124,6 +140,8 @@ export const IPC = {
   resumeAll: 'download:resumeAll',
   deleteReciter: 'download:deleteReciter',
   deleteSurah: 'download:deleteSurah',
+  getActiveQueue: 'download:getActiveQueue',
+  isPaused: 'download:isPaused',
 
   getStorageUsage: 'storage:getUsage',
 

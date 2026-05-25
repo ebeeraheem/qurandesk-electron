@@ -1,33 +1,36 @@
 import { useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
-import type { ReciterSummary, SurahDownload } from '@shared/api'
+import type { ReciterSummary, StorageUsage } from '@shared/api'
 import ReciterAvatar from '../components/ReciterAvatar'
 import SurahRow from '../components/SurahRow'
+import ConfirmDownloadDialog from '../components/ConfirmDownloadDialog'
 import { formatBytes } from '../utils/format'
+import { useReciterDownloads } from '../stores/downloads'
 
 export default function ReciterDetail(): React.JSX.Element {
   const { id } = useParams<{ id: string }>()
   const [reciter, setReciter] = useState<ReciterSummary | null>(null)
-  const [downloads, setDownloads] = useState<SurahDownload[]>([])
   const [notFound, setNotFound] = useState(false)
+  const [dialogOpen, setDialogOpen] = useState(false)
+  const [usage, setUsage] = useState<StorageUsage | null>(null)
+  const downloads = useReciterDownloads(id)
 
   const reload = async (reciterId: string): Promise<void> => {
-    const [list, dl] = await Promise.all([
-      window.api.getReciters(),
-      window.api.getSurahDownloads(reciterId)
-    ])
+    const list = await window.api.getReciters()
     const found = list.find((r) => r.id === reciterId) ?? null
     setReciter(found)
-    setDownloads(dl)
     if (!found) setNotFound(true)
   }
 
   useEffect(() => {
     if (!id) return
     void reload(id)
-    // Re-fetch whenever the manifest changes (e.g. background refresh, refresh button).
-    const unsubscribe = window.api.on('manifest:updated', () => void reload(id))
-    return unsubscribe
+    const off1 = window.api.on('manifest:updated', () => void reload(id))
+    const off2 = window.api.on('download:completed', () => void reload(id))
+    return () => {
+      off1()
+      off2()
+    }
   }, [id])
 
   if (notFound) {
@@ -48,6 +51,28 @@ export default function ReciterDetail(): React.JSX.Element {
     return <div className="px-10 py-8 text-sm text-muted">Loading…</div>
   }
 
+  // Aggregate live counts from the downloads store.
+  const downloadedCount = downloads.filter((d) => d.status === 'downloaded').length
+  const inFlight = downloads.filter(
+    (d) => d.status === 'queued' || d.status === 'active' || d.status === 'failed'
+  ).length
+  const surahsRemaining = 114 - downloadedCount - inFlight
+
+  // Per-surah estimate from the full-set total (manifest doesn't carry per-surah sizes).
+  const estimatedBytes =
+    reciter.totalSizeBytes != null && surahsRemaining > 0
+      ? Math.round((reciter.totalSizeBytes * surahsRemaining) / 114)
+      : undefined
+
+  const openDialog = async (): Promise<void> => {
+    try {
+      setUsage(await window.api.getStorageUsage())
+    } catch {
+      setUsage(null)
+    }
+    setDialogOpen(true)
+  }
+
   return (
     <div className="px-10 py-8">
       <div className="app-drag pb-3">
@@ -62,16 +87,23 @@ export default function ReciterDetail(): React.JSX.Element {
           <div className="min-w-0">
             <h1 className="truncate text-3xl font-bold">{reciter.name}</h1>
             <p className="mt-1 text-sm text-muted">
-              {reciter.style ?? '—'} · {formatBytes(reciter.totalSizeBytes)} · {reciter.downloadedSurahs}{' '}
-              / 114 on disk
+              {reciter.style ?? '—'} · {formatBytes(reciter.totalSizeBytes)} · {downloadedCount} / 114
+              {inFlight > 0 && (
+                <span className="ml-1 text-primary">({inFlight} in progress)</span>
+              )}
             </p>
           </div>
-          <AggregateButton reciter={reciter} />
+          <AggregateButton
+            downloadedCount={downloadedCount}
+            inFlight={inFlight}
+            surahsRemaining={surahsRemaining}
+            onClick={openDialog}
+          />
         </div>
       </header>
 
       <section className="mt-2 rounded-xl border border-border bg-bg-elev">
-        <div className="grid grid-cols-[44px_1fr_auto_44px] gap-4 border-b border-border px-5 py-2.5 text-[10px] font-semibold uppercase tracking-widest text-faint">
+        <div className="grid grid-cols-[44px_1fr_auto_84px] gap-4 border-b border-border px-5 py-2.5 text-[10px] font-semibold uppercase tracking-widest text-faint">
           <div className="text-right">#</div>
           <div>Surah</div>
           <div className="text-right">العربية</div>
@@ -85,45 +117,68 @@ export default function ReciterDetail(): React.JSX.Element {
           ))}
         </ol>
       </section>
+
+      <ConfirmDownloadDialog
+        open={dialogOpen}
+        reciterName={reciter.name}
+        surahsRemaining={surahsRemaining}
+        estimatedBytes={estimatedBytes}
+        freeBytes={usage?.freeBytes}
+        totalBytes={usage?.totalBytes}
+        onClose={() => setDialogOpen(false)}
+        onConfirm={() => {
+          setDialogOpen(false)
+          void window.api.downloadReciter(reciter.id)
+        }}
+      />
     </div>
   )
 }
 
-/**
- * Header CTA. Phase 5 renders the three states (Download all / Resume /
- * Downloaded) but the buttons that trigger downloads are disabled until the
- * downloader lands in Phase 6.
- */
-function AggregateButton({ reciter }: { reciter: ReciterSummary }): React.JSX.Element {
-  switch (reciter.downloadState) {
-    case 'complete':
-      return (
-        <div className="flex items-center gap-2 rounded-full bg-success/15 px-4 py-2 text-xs font-semibold text-success">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="size-4">
-            <path d="m5 12 5 5 9-11" strokeLinecap="round" strokeLinejoin="round" />
-          </svg>
-          Downloaded
-        </div>
-      )
-    case 'partial':
-      return (
-        <button
-          disabled
-          title="Resume downloads (coming in Phase 6)"
-          className="rounded-full bg-primary px-5 py-2 text-xs font-semibold text-white disabled:opacity-60"
-        >
-          Resume · {114 - reciter.downloadedSurahs} left
-        </button>
-      )
-    default:
-      return (
-        <button
-          disabled
-          title="Download all (coming in Phase 6)"
-          className="rounded-full bg-primary px-5 py-2 text-xs font-semibold text-white disabled:opacity-60"
-        >
-          Download all 114
-        </button>
-      )
+function AggregateButton({
+  downloadedCount,
+  inFlight,
+  surahsRemaining,
+  onClick
+}: {
+  downloadedCount: number
+  inFlight: number
+  surahsRemaining: number
+  onClick: () => void
+}): React.JSX.Element {
+  if (downloadedCount >= 114) {
+    return (
+      <div className="flex items-center gap-2 rounded-full bg-success/15 px-4 py-2 text-xs font-semibold text-success">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="size-4">
+          <path d="m5 12 5 5 9-11" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+        Downloaded
+      </div>
+    )
   }
+
+  // Nothing left to add to the queue — already covered by in-flight items.
+  if (surahsRemaining === 0) {
+    return (
+      <div className="rounded-full bg-bg-tint px-5 py-2 text-xs font-semibold text-primary">
+        Downloading {inFlight}…
+      </div>
+    )
+  }
+
+  const label =
+    inFlight > 0
+      ? `Add ${surahsRemaining} more`
+      : downloadedCount > 0
+        ? `Resume · ${surahsRemaining} left`
+        : 'Download all 114'
+
+  return (
+    <button
+      onClick={onClick}
+      className="rounded-full bg-primary px-5 py-2 text-xs font-semibold text-white shadow-sm hover:opacity-90"
+    >
+      {label}
+    </button>
+  )
 }

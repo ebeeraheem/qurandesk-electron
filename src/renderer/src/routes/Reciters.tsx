@@ -28,8 +28,13 @@ export default function Reciters(): React.JSX.Element {
 
   useEffect(() => {
     void reload()
-    const unsubscribe = window.api.on('manifest:updated', () => void reload())
-    return unsubscribe
+    const off1 = window.api.on('manifest:updated', () => void reload())
+    // Re-fetch reciter list when a download completes so badge counts stay live.
+    const off2 = window.api.on('download:completed', () => void reload())
+    return () => {
+      off1()
+      off2()
+    }
   }, [])
 
   const filtered = useMemo(() => {

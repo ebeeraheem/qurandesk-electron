@@ -2,10 +2,7 @@ import { contextBridge, ipcRenderer } from 'electron'
 import { electronAPI } from '@electron-toolkit/preload'
 import { IPC, type QuranDeskAPI } from '../shared/api'
 
-// Maps the public API surface (one method per IPC.*) to ipcRenderer.invoke.
-// Feature methods are wired here; in early phases the main side may not implement them yet,
-// in which case calls reject — that's expected.
-const notImplemented = (name: string) => async () => {
+const notImplemented = (name: string) => async (): Promise<never> => {
   throw new Error(`IPC handler not yet implemented: ${name}`)
 }
 
@@ -18,17 +15,25 @@ const api: QuranDeskAPI = {
   refreshManifest: () => ipcRenderer.invoke(IPC.refreshManifest),
   getManifestStatus: () => ipcRenderer.invoke(IPC.getManifestStatus),
 
-  // Stubs — populated by later phases.
+  // Surah-level
   getSurahDownloads: (reciterId) => ipcRenderer.invoke(IPC.getSurahDownloads, reciterId),
   getAudioUrl: (reciterId, surah) => ipcRenderer.invoke(IPC.getAudioUrl, reciterId, surah),
-  downloadSurah: notImplemented('downloadSurah'),
-  downloadReciter: notImplemented('downloadReciter'),
-  cancelDownload: notImplemented('cancelDownload'),
-  pauseAll: notImplemented('pauseAll'),
-  resumeAll: notImplemented('resumeAll'),
-  deleteReciter: notImplemented('deleteReciter'),
-  deleteSurah: notImplemented('deleteSurah'),
-  getStorageUsage: notImplemented('getStorageUsage'),
+
+  // Downloads
+  downloadSurah: (reciterId, surah) => ipcRenderer.invoke(IPC.downloadSurah, reciterId, surah),
+  downloadReciter: (reciterId) => ipcRenderer.invoke(IPC.downloadReciter, reciterId),
+  cancelDownload: (reciterId, surah) => ipcRenderer.invoke(IPC.cancelDownload, reciterId, surah),
+  pauseAll: () => ipcRenderer.invoke(IPC.pauseAll),
+  resumeAll: () => ipcRenderer.invoke(IPC.resumeAll),
+  deleteReciter: (reciterId) => ipcRenderer.invoke(IPC.deleteReciter, reciterId),
+  deleteSurah: (reciterId, surah) => ipcRenderer.invoke(IPC.deleteSurah, reciterId, surah),
+  getActiveQueue: () => ipcRenderer.invoke(IPC.getActiveQueue),
+  isPaused: () => ipcRenderer.invoke(IPC.isPaused),
+
+  // Storage
+  getStorageUsage: () => ipcRenderer.invoke(IPC.getStorageUsage),
+
+  // Stubs — populated by later phases.
   getSettings: notImplemented('getSettings'),
   updateSettings: notImplemented('updateSettings'),
   checkForUpdates: notImplemented('checkForUpdates'),

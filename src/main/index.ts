@@ -12,7 +12,10 @@ import {
   registerScheme as registerProtocolScheme
 } from './protocol'
 import * as manifest from './manifest'
-import { buildReciterSummary, getSurahDownloads } from './downloads'
+import { buildReciterSummary, getSurahDownloads, reconcileFilesystem } from './downloads'
+import { close as closeDb, getDb } from './db'
+import * as downloader from './downloader'
+import { getStorageUsage } from './storage'
 
 // Privileged scheme registration MUST happen before app is ready.
 registerProtocolScheme()
@@ -52,14 +55,28 @@ function createWindow(): void {
   }
 }
 
-/** Broadcast a renderer event to every open window. */
 function broadcast(channel: string, ...args: unknown[]): void {
   for (const w of BrowserWindow.getAllWindows()) {
     if (!w.isDestroyed()) w.webContents.send(channel, ...args)
   }
 }
 
+function validateReciterId(id: unknown): string {
+  if (typeof id !== 'string' || !/^[a-z0-9-]+$/.test(id)) {
+    throw new Error(`Invalid reciter id: ${String(id)}`)
+  }
+  return id
+}
+
+function validateSurah(n: unknown): number {
+  if (typeof n !== 'number' || !Number.isInteger(n) || n < 1 || n > 114) {
+    throw new Error(`Invalid surah number: ${String(n)}`)
+  }
+  return n
+}
+
 function registerIpcHandlers(): void {
+  // Bootstrap.
   ipcMain.handle(IPC.ping, async () => 'pong' as const)
   ipcMain.handle(IPC.getAppInfo, async () => ({
     version: app.getVersion(),
@@ -68,21 +85,19 @@ function registerIpcHandlers(): void {
     audioDir: getAudioRoot()
   }))
 
-  // Audio protocol ↔ IPC.
-  ipcMain.handle(IPC.getAudioUrl, async (_e, reciterId: string, surah: number) => {
-    const exists = await audioFileIfExists(reciterId, surah)
-    return exists ? audioUrl(reciterId, surah) : null
+  // Audio protocol.
+  ipcMain.handle(IPC.getAudioUrl, async (_e, reciterId: unknown, surah: unknown) => {
+    const r = validateReciterId(reciterId)
+    const s = validateSurah(surah)
+    const exists = await audioFileIfExists(r, s)
+    return exists ? audioUrl(r, s) : null
   })
 
   // Catalog.
   ipcMain.handle(IPC.getReciters, async () => {
     const m = manifest.getCachedManifest()
     if (!m) return []
-    // Resolve each reciter's on-disk download stats in parallel.
-    return Promise.all(m.reciters.map(buildReciterSummary))
-  })
-  ipcMain.handle(IPC.getSurahDownloads, async (_e, reciterId: string) => {
-    return getSurahDownloads(reciterId)
+    return m.reciters.map(buildReciterSummary)
   })
   ipcMain.handle(IPC.refreshManifest, async () => {
     const result = await manifest.refresh()
@@ -93,6 +108,43 @@ function registerIpcHandlers(): void {
     const s = manifest.getStatus()
     return { cachedAt: s.cachedAt, lastError: s.lastError }
   })
+  ipcMain.handle(IPC.getSurahDownloads, async (_e, reciterId: unknown) => {
+    return getSurahDownloads(validateReciterId(reciterId))
+  })
+
+  // Downloader.
+  ipcMain.handle(IPC.downloadSurah, async (_e, reciterId: unknown, surah: unknown) => {
+    downloader.enqueueSurah(validateReciterId(reciterId), validateSurah(surah))
+  })
+  ipcMain.handle(IPC.downloadReciter, async (_e, reciterId: unknown) => {
+    downloader.enqueueReciter(validateReciterId(reciterId))
+  })
+  ipcMain.handle(IPC.cancelDownload, async (_e, reciterId: unknown, surah: unknown) => {
+    await downloader.cancelSurah(validateReciterId(reciterId), validateSurah(surah))
+  })
+  ipcMain.handle(IPC.pauseAll, async () => {
+    downloader.pauseAll()
+  })
+  ipcMain.handle(IPC.resumeAll, async () => {
+    downloader.resumeAll()
+  })
+  ipcMain.handle(IPC.deleteSurah, async (_e, reciterId: unknown, surah: unknown) => {
+    await downloader.deleteSurah(validateReciterId(reciterId), validateSurah(surah))
+  })
+  ipcMain.handle(IPC.deleteReciter, async (_e, reciterId: unknown) => {
+    await downloader.deleteReciter(validateReciterId(reciterId))
+  })
+  ipcMain.handle(IPC.getActiveQueue, async () => {
+    return downloader.getActiveQueue()
+  })
+  ipcMain.handle(IPC.isPaused, async () => {
+    return downloader.isPaused()
+  })
+
+  // Storage.
+  ipcMain.handle(IPC.getStorageUsage, async () => {
+    return getStorageUsage()
+  })
 }
 
 app.whenReady().then(async () => {
@@ -102,24 +154,25 @@ app.whenReady().then(async () => {
     optimizer.watchWindowShortcuts(window)
   })
 
-  // Order matters here:
-  //  1. Audio dir + protocol handler so the renderer can resolve URLs from first paint
-  //  2. Load any cached manifest from disk so the renderer skips Welcome on returning launches
-  //  3. Register IPC handlers
-  //  4. Create the window (renderer may call getReciters() during mount)
-  //  5. Wire manifest event fan-out
-  //  6. Fire-and-forget a background refresh
   await initAudioRoot()
   registerProtocolHandler()
   await manifest.loadCache()
+  // Touch the DB now so any startup migrations run before IPC handlers fire.
+  getDb()
+  await reconcileFilesystem()
   registerIpcHandlers()
   createWindow()
 
+  // Manifest event fan-out.
   manifest.onUpdated(() => broadcast(EVENTS.manifestUpdated))
-  manifest.refresh().catch(() => {
-    // Errors are already captured into manifest.getStatus().lastError and broadcast
-    // via `manifest:updated`; nothing more to do here.
-  })
+  manifest.refresh().catch(() => undefined)
+
+  // Downloader event fan-out.
+  downloader.onProgress((p) => broadcast(EVENTS.downloadProgress, p))
+  downloader.onCompleted((p) => broadcast(EVENTS.downloadCompleted, p))
+
+  // Boot the downloader: demote leftover 'active' rows + resume queue.
+  downloader.recoverFromCrash()
 
   app.on('activate', function () {
     if (BrowserWindow.getAllWindows().length === 0) createWindow()
@@ -127,6 +180,7 @@ app.whenReady().then(async () => {
 })
 
 app.on('window-all-closed', () => {
+  closeDb()
   if (process.platform !== 'darwin') {
     app.quit()
   }
