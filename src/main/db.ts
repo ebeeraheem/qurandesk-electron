@@ -53,6 +53,23 @@ function migrate(d: Database.Database): void {
     CREATE INDEX IF NOT EXISTS idx_queue_status ON download_queue(status);
     CREATE INDEX IF NOT EXISTS idx_queue_reciter ON download_queue(reciter_id);
     CREATE INDEX IF NOT EXISTS idx_downloads_reciter ON downloads(reciter_id);
+
+    -- Flat KV store for user settings. Values are JSON-encoded so we can
+    -- distinguish booleans, numbers, and strings without a separate column.
+    CREATE TABLE IF NOT EXISTS settings (
+      key   TEXT PRIMARY KEY,
+      value TEXT NOT NULL
+    );
+
+    -- Singleton row that records what the user was listening to last so the
+    -- player can re-open to that surah at the saved position on next launch.
+    CREATE TABLE IF NOT EXISTS playback_state (
+      id               INTEGER PRIMARY KEY CHECK (id = 1),
+      reciter_id       TEXT,
+      surah_number     INTEGER,
+      position_seconds REAL    NOT NULL DEFAULT 0,
+      updated_at       INTEGER NOT NULL
+    );
   `)
 }
 

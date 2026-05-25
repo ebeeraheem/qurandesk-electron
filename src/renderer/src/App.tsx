@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Navigate, Route, Routes } from 'react-router-dom'
+import { Navigate, Route, Routes, useLocation } from 'react-router-dom'
 import Sidebar from './components/Sidebar'
 import PlayerBar from './components/PlayerBar'
 import AudioEngine from './components/AudioEngine'
@@ -8,16 +8,13 @@ import ReciterDetail from './routes/ReciterDetail'
 import Downloads from './routes/Downloads'
 import Settings from './routes/Settings'
 import Welcome from './routes/Welcome'
+import NowPlaying from './routes/NowPlaying'
 
 type Gate =
   | { kind: 'checking' }
-  | { kind: 'welcome' } // first launch, no cached manifest yet
-  | { kind: 'app' } // returning user OR welcome dismissed
+  | { kind: 'welcome' }
+  | { kind: 'app' }
 
-/**
- * Decides whether to show the Welcome splash or the main app shell. The
- * decision is made once on mount based on whether main has a cached manifest.
- */
 export default function App(): React.JSX.Element {
   const [gate, setGate] = useState<Gate>({ kind: 'checking' })
 
@@ -29,7 +26,6 @@ export default function App(): React.JSX.Element {
   }, [])
 
   if (gate.kind === 'checking') {
-    // Briefly blank — we don't want to flash Welcome on returning launches.
     return <div className="h-full w-full bg-bg" />
   }
 
@@ -48,12 +44,20 @@ export default function App(): React.JSX.Element {
             <Route path="/reciter/:id" element={<ReciterDetail />} />
             <Route path="/downloads" element={<Downloads />} />
             <Route path="/settings" element={<Settings />} />
+            <Route path="/now-playing" element={<NowPlaying />} />
             <Route path="*" element={<Navigate to="/reciters" replace />} />
           </Routes>
         </main>
       </div>
-      <PlayerBar />
+      <BottomBar />
       <AudioEngine />
     </div>
   )
+}
+
+/** PlayerBar is suppressed while the Now Playing route is active. */
+function BottomBar(): React.JSX.Element | null {
+  const { pathname } = useLocation()
+  if (pathname === '/now-playing') return null
+  return <PlayerBar />
 }

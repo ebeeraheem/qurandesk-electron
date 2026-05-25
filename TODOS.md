@@ -96,11 +96,18 @@ Legend: ✅ done · 🚧 in progress · ⬜ not started
 
 ## Phase 8 — Player
 
-- ⬜ HTML5 `<audio>` pointed at `app://` URLs
-- ⬜ Continuous play with `autoAdvanceMode = 'stop' | 'download-then-play'`
-- ⬜ Persist last reciter / surah / position
-- ⬜ Variable playback speed (0.75 / 1.0 / 1.25 / 1.5)
-- ⬜ Expanded Now Playing view
+- ✅ HTML5 `<audio>` pointed at `app://` URLs (shipped in Phase 5)
+- ✅ Variable playback speed (shipped in Phase 5)
+- ✅ Settings + playback-state SQLite tables, `src/main/settings.ts` + `src/main/playback.ts`
+- ✅ `getSettings` / `updateSettings` / `getLastPlayback` / `setLastPlayback` IPC wired
+- ✅ Renderer `stores/settings.ts` with optimistic update + IPC sync
+- ✅ **Repeat mode** (player-bar + Now Playing button) backed by `settings.repeatMode`. `'off'` (default) = sequential play stopping at 114 / at first not-downloaded gap; `'one'` = loop current surah. Replaced the earlier `autoAdvance: boolean` toggle which was confusing — sequential play is the implicit default, the meaningful user choice is whether to loop one
+- ✅ `handleEnded` advances to next surah; `'stop'` mode leaves a hint, `'download-then-play'` enqueues + sets `pendingTrack`; `download:completed` resolves pending into playback
+- ✅ Prev / Next surah navigation (1↔114 clamped)
+- ✅ Position persistence — `playback_state` written on play / pause / ended + throttled ~5s during playback + on `beforeunload`
+- ✅ App boots restoring last track into `current` *and* pre-loads `audioEl.src` so the next play press resumes from the saved position. Removed the `resumePosition` one-shot — it was set but never made the audio element load anything, so play did nothing and duration stayed at 0. Now `applySrc(url, seekTo)` pushes the URL eagerly and queues it if `AudioEngine` hasn't mounted yet (covers the boot race between `restoreLastPlayback` and React's `useEffect`)
+- ✅ `/now-playing` route — large avatar, bismillah (omitted for surah 1 + 9), big Arabic name, Latin + meaning, reciter + "Surah X of 114", scrubber, control cluster (continuous, prev, big play/pause, next, speed)
+- ✅ PlayerBar hidden while `/now-playing` is active; chevron-down collapses back; clicking PlayerBar's now-playing summary or expand icon opens NowPlaying
 
 ## Phase 9 — Settings & storage
 

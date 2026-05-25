@@ -13,25 +13,26 @@ export type CurrentTrack = {
 type PlayerState = {
   current: CurrentTrack | null
   status: PlayerStatus
-  position: number // seconds — driven by audio `timeupdate`
-  duration: number // seconds — driven by audio `loadedmetadata`
+  /** Seconds — driven by audio `timeupdate`. */
+  position: number
+  /** Seconds — driven by audio `loadedmetadata`. */
+  duration: number
   speed: PlaybackSpeedValue
   errorMessage: string | null
+  /**
+   * Set when auto-advance has triggered a download for the next surah; the
+   * track will start playing once `download:completed` fires with a matching
+   * reciter + surah pair. Cleared whenever the user manually moves the track.
+   */
+  pendingTrack: CurrentTrack | null
 }
 
-/**
- * Source of truth for "what's playing" and the displayed player state.
- *
- * Imperative audio commands (play/pause/seek/setSpeed) live in
- * `audioEngine.ts` so the store doesn't need to know about the DOM. The
- * AudioEngine component writes back into this store from the underlying
- * `<audio>` element's events.
- */
 export const usePlayerStore = create<PlayerState>(() => ({
   current: null,
   status: 'idle',
   position: 0,
   duration: 0,
   speed: 1.0,
-  errorMessage: null
+  errorMessage: null,
+  pendingTrack: null
 }))

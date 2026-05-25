@@ -25,12 +25,30 @@ export type PlaybackSpeed = 0.75 | 1.0 | 1.25 | 1.5
 
 export type AutoAdvanceMode = 'stop' | 'download-then-play'
 
+/**
+ * 'off' = sequential continuous play (the default). At end of surah we move
+ *         to surah N+1, subject to `autoAdvanceMode` when N+1 isn't on disk.
+ *         Stops cleanly at surah 114.
+ * 'one' = loop the current surah indefinitely.
+ *
+ * "Repeat all" (wrap 114→1) isn't included — not a useful Qur'an workflow.
+ */
+export type RepeatMode = 'off' | 'one'
+
 export type Settings = {
   theme: ThemePreference
   defaultReciterId: string | null
   defaultPlaybackSpeed: PlaybackSpeed
+  repeatMode: RepeatMode
+  /** What to do when the next surah isn't on disk. */
   autoAdvanceMode: AutoAdvanceMode
 }
+
+export type LastPlayback = {
+  reciterId: string
+  surahNumber: number
+  positionSeconds: number
+} | null
 
 export type UpdateStatus =
   | { status: 'up-to-date' }
@@ -99,6 +117,10 @@ export interface QuranDeskAPI {
   getSettings: () => Promise<Settings>
   updateSettings: (patch: Partial<Settings>) => Promise<Settings>
 
+  // Playback persistence
+  getLastPlayback: () => Promise<LastPlayback>
+  setLastPlayback: (state: LastPlayback) => Promise<void>
+
   // Updates
   checkForUpdates: () => Promise<UpdateStatus>
   installUpdateOnQuit: () => Promise<void>
@@ -147,6 +169,8 @@ export const IPC = {
 
   getSettings: 'settings:get',
   updateSettings: 'settings:update',
+  getLastPlayback: 'playback:get',
+  setLastPlayback: 'playback:set',
 
   checkForUpdates: 'updater:check',
   installUpdateOnQuit: 'updater:installOnQuit'
@@ -156,5 +180,6 @@ export const DEFAULT_SETTINGS: Settings = {
   theme: 'system',
   defaultReciterId: null,
   defaultPlaybackSpeed: 1.0,
+  repeatMode: 'off',
   autoAdvanceMode: 'stop'
 }

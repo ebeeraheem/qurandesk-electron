@@ -33,9 +33,13 @@ const api: QuranDeskAPI = {
   // Storage
   getStorageUsage: () => ipcRenderer.invoke(IPC.getStorageUsage),
 
+  // Settings + playback persistence
+  getSettings: () => ipcRenderer.invoke(IPC.getSettings),
+  updateSettings: (patch) => ipcRenderer.invoke(IPC.updateSettings, patch),
+  getLastPlayback: () => ipcRenderer.invoke(IPC.getLastPlayback),
+  setLastPlayback: (state) => ipcRenderer.invoke(IPC.setLastPlayback, state),
+
   // Stubs — populated by later phases.
-  getSettings: notImplemented('getSettings'),
-  updateSettings: notImplemented('updateSettings'),
   checkForUpdates: notImplemented('checkForUpdates'),
   installUpdateOnQuit: notImplemented('installUpdateOnQuit'),
 

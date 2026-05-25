@@ -16,6 +16,9 @@ import { buildReciterSummary, getSurahDownloads, reconcileFilesystem } from './d
 import { close as closeDb, getDb } from './db'
 import * as downloader from './downloader'
 import { getStorageUsage } from './storage'
+import { getSettings, updateSettings } from './settings'
+import { getLastPlayback, setLastPlayback } from './playback'
+import type { LastPlayback, Settings } from '../shared/api'
 
 // Privileged scheme registration MUST happen before app is ready.
 registerProtocolScheme()
@@ -145,6 +148,14 @@ function registerIpcHandlers(): void {
   ipcMain.handle(IPC.getStorageUsage, async () => {
     return getStorageUsage()
   })
+
+  // Settings.
+  ipcMain.handle(IPC.getSettings, async () => getSettings())
+  ipcMain.handle(IPC.updateSettings, async (_e, patch: Partial<Settings>) => updateSettings(patch))
+
+  // Playback persistence.
+  ipcMain.handle(IPC.getLastPlayback, async () => getLastPlayback())
+  ipcMain.handle(IPC.setLastPlayback, async (_e, state: LastPlayback) => setLastPlayback(state))
 }
 
 app.whenReady().then(async () => {
