@@ -1,5 +1,55 @@
 @import 'tailwindcss';
 
+/* ---------------------------------------------------------------------------
+   Bundled fonts. TTF files live next to this CSS under ./fonts/. Vite
+   inlines the URLs at build time and ships the binaries inside the asar.
+   `font-display: swap` paints fallbacks immediately if a face isn't ready
+   yet — happens briefly on first run while Chromium decodes the TTF.
+--------------------------------------------------------------------------- */
+
+@font-face {
+  font-family: 'Poppins';
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+  src: url('./fonts/Poppins-Regular.ttf') format('truetype');
+}
+@font-face {
+  font-family: 'Poppins';
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+  src: url('./fonts/Poppins-Medium.ttf') format('truetype');
+}
+@font-face {
+  font-family: 'Poppins';
+  font-weight: 600;
+  font-style: normal;
+  font-display: swap;
+  src: url('./fonts/Poppins-SemiBold.ttf') format('truetype');
+}
+@font-face {
+  font-family: 'Poppins';
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+  src: url('./fonts/Poppins-Bold.ttf') format('truetype');
+}
+@font-face {
+  font-family: 'Amiri';
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+  src: url('./fonts/Amiri-Regular.ttf') format('truetype');
+}
+@font-face {
+  font-family: 'Amiri';
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+  src: url('./fonts/Amiri-Bold.ttf') format('truetype');
+}
+
 /* Manual class-based dark mode — toggled by setting `.dark` on <html>. */
 @custom-variant dark (&:where(.dark, .dark *));
 
@@ -26,9 +76,11 @@
   --color-danger: #c12940;
   --color-warm: #f98091;
 
-  /* Type stack — Apple-first, Segoe UI fallback for Windows */
+  /* Type stack. System fonts kept as fallbacks while @font-face decodes
+     and as last-resort glyph coverage. */
   --font-sans:
-    -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+    'Poppins', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui,
+    sans-serif;
   --font-arabic:
     'Amiri', 'Geeza Pro', 'Traditional Arabic', 'Segoe UI', serif;
 }

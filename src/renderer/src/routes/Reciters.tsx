@@ -2,8 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import type { ReciterSummary } from '@shared/api'
 import ReciterCard from '../components/ReciterCard'
-import { formatAbsoluteDate, formatRelativeTime } from '../utils/format'
-import { useOnlineStatus } from '../utils/online'
+import { formatRelativeTime } from '../utils/format'
 
 export default function Reciters(): React.JSX.Element {
   const navigate = useNavigate()
@@ -14,7 +13,6 @@ export default function Reciters(): React.JSX.Element {
   })
   const [query, setQuery] = useState('')
   const [loaded, setLoaded] = useState(false)
-  const online = useOnlineStatus()
 
   const reload = async (): Promise<void> => {
     const [list, s] = await Promise.all([
@@ -60,11 +58,9 @@ export default function Reciters(): React.JSX.Element {
         </div>
       </header>
 
-      {!online && reciters.length > 0 && <OfflineBanner cachedAt={status.cachedAt} />}
-
       {/* Empty / error states */}
       {loaded && reciters.length === 0 && (
-        <EmptyOrError lastError={status.lastError} online={online} onRetry={() => void reload()} />
+        <EmptyOrError lastError={status.lastError} onRetry={() => void reload()} />
       )}
 
       {reciters.length > 0 && filtered.length === 0 && (
@@ -120,53 +116,13 @@ function SearchInput({
   )
 }
 
-function OfflineBanner({ cachedAt }: { cachedAt: number | null }): React.JSX.Element {
-  return (
-    <div className="mb-6 flex items-center gap-3 rounded-lg border border-warning/30 bg-warning/10 px-4 py-2 text-xs text-warning">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="size-4 shrink-0">
-        <path d="M2 12a10 10 0 0 1 20 0" />
-        <path d="M5 12a7 7 0 0 1 14 0" />
-        <circle cx="12" cy="20" r="1" fill="currentColor" />
-      </svg>
-      <span>
-        Offline — showing last known catalog
-        {cachedAt != null && (
-          <span className="ml-1 text-warning/70">
-            (cached {formatRelativeTime(cachedAt)}
-            {cachedAt && ` · ${formatAbsoluteDate(new Date(cachedAt).toISOString())}`})
-          </span>
-        )}
-      </span>
-    </div>
-  )
-}
-
 function EmptyOrError({
   lastError,
-  online,
   onRetry
 }: {
   lastError: string | null
-  online: boolean
   onRetry: () => void
 }): React.JSX.Element {
-  if (!online) {
-    return (
-      <div className="grid place-items-center rounded-xl border border-border bg-bg-elev px-6 py-16 text-center">
-        <div className="text-sm font-semibold text-fg">Connect to the internet</div>
-        <p className="mt-2 max-w-sm text-sm text-muted">
-          The catalog of reciters lives online. Once you&apos;re back online QuranDesk will load it
-          automatically.
-        </p>
-        <button
-          onClick={onRetry}
-          className="mt-4 rounded-md bg-primary px-4 py-1.5 text-sm font-semibold text-white"
-        >
-          Retry
-        </button>
-      </div>
-    )
-  }
   return (
     <div className="grid place-items-center rounded-xl border border-border bg-bg-elev px-6 py-16 text-center">
       <div className="text-sm font-semibold text-fg">Couldn&apos;t load the catalog</div>

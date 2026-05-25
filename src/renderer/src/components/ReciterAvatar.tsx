@@ -1,15 +1,21 @@
 import { useState } from 'react'
 import type { ReciterSummary } from '@shared/api'
 
+const ALLOWED_EXT = new Set(['jpg', 'jpeg', 'png', 'webp', 'avif', 'gif'])
+
 /**
  * Square thumbnail for a reciter card. Owns its own `aspect-square` so the
- * crop is uniform across cards regardless of the parent's height resolution.
+ * crop is uniform across cards.
  *
- * Loads `photo_url` when available; on error or when no URL is provided, falls
- * back to an SVG placeholder (gradient + first letter) that scales perfectly
- * with the container. The design mocks use Arabic letters here — once the
- * manifest carries `name_ar` (see TODOS open items) the fallback will render
- * the Arabic glyph instead of the English first letter.
+ * Photos load via `app://photo/<id>.<ext>?from=<r2-url>`. The protocol
+ * handler serves the cached version when available; otherwise it lazily
+ * fetches from the `from` source (validated server-side against the manifest
+ * host) and persists for next time. Result: photos load once online and
+ * keep working offline thereafter.
+ *
+ * On any failure (missing photo_url, unsupported ext, fetch error before
+ * first cache, etc.) we fall back to an SVG placeholder — a gradient + the
+ * reciter's first letter — so the catalog never shows broken-image icons.
  */
 export default function ReciterAvatar({
   reciter,
@@ -19,7 +25,7 @@ export default function ReciterAvatar({
   className?: string
 }): React.JSX.Element {
   const [errored, setErrored] = useState(false)
-  const showPhoto = reciter.photoUrl && !errored
+  const src = errored ? null : photoSrc(reciter)
 
   return (
     <div
@@ -28,9 +34,9 @@ export default function ReciterAvatar({
         className
       ].join(' ')}
     >
-      {showPhoto ? (
+      {src ? (
         <img
-          src={reciter.photoUrl ?? undefined}
+          src={src}
           alt={reciter.name}
           loading="lazy"
           onError={() => setErrored(true)}
@@ -44,13 +50,28 @@ export default function ReciterAvatar({
 }
 
 /**
- * Gradient + letter, rendered as SVG so the typography stays a fixed
- * proportion of the card no matter what size the grid lays the card at.
+ * Compose the `app://photo/...` URL for a reciter. Returns `null` when the
+ * source URL is missing or has an extension we don't serve, in which case
+ * the avatar falls back to the placeholder without even attempting a load.
  */
+function photoSrc(reciter: ReciterSummary): string | null {
+  if (!reciter.photoUrl) return null
+  let pathname: string
+  try {
+    pathname = new URL(reciter.photoUrl).pathname
+  } catch {
+    return null
+  }
+  const m = /\.([a-z0-9]+)$/i.exec(pathname)
+  if (!m) return null
+  const ext = m[1].toLowerCase()
+  if (!ALLOWED_EXT.has(ext)) return null
+  return `app://photo/${reciter.id}.${ext}?from=${encodeURIComponent(reciter.photoUrl)}`
+}
+
 function PlaceholderArt({ reciter }: { reciter: ReciterSummary }): React.JSX.Element {
   const hue = hashToHue(reciter.id)
   const letter = firstLetter(reciter.name)
-  // Unique per-reciter so multiple <defs> in the same document don't collide.
   const gradientId = `reciter-grad-${reciter.id}`
 
   return (
@@ -84,7 +105,6 @@ function PlaceholderArt({ reciter }: { reciter: ReciterSummary }): React.JSX.Ele
   )
 }
 
-/** Stable hash → hue in [0, 360). Same id always picks the same colour. */
 function hashToHue(id: string): number {
   let h = 0
   for (let i = 0; i < id.length; i++) {
@@ -96,6 +116,5 @@ function hashToHue(id: string): number {
 function firstLetter(name: string): string {
   const trimmed = name.trim()
   if (!trimmed) return '·'
-  // Code-point-aware first character (handles surrogate-pair edge cases cleanly).
   return [...trimmed][0]!.toUpperCase()
 }

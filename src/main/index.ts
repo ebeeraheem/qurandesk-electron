@@ -13,6 +13,7 @@ import {
   registerScheme as registerProtocolScheme
 } from './protocol'
 import * as manifest from './manifest'
+import * as photos from './photos'
 import { buildReciterSummary, getSurahDownloads, reconcileFilesystem } from './downloads'
 import { close as closeDb, getDb } from './db'
 import * as downloader from './downloader'
@@ -177,6 +178,7 @@ app.whenReady().then(async () => {
   })
 
   await initAudioRoot()
+  await photos.initPhotoRoot()
   registerProtocolHandler()
   await manifest.loadCache()
   // Touch the DB now so any startup migrations run before IPC handlers fire.
@@ -185,9 +187,17 @@ app.whenReady().then(async () => {
   registerIpcHandlers()
   createWindow()
 
-  // Manifest event fan-out.
-  manifest.onUpdated(() => broadcast(EVENTS.manifestUpdated))
+  // Manifest event fan-out — and kick off a background photo pre-cache
+  // whenever the catalog changes so the offline catalog has avatars.
+  manifest.onUpdated(() => {
+    broadcast(EVENTS.manifestUpdated)
+    void photos.precacheAll()
+  })
   manifest.refresh().catch(() => undefined)
+  // If we restored a cached manifest above, pre-cache its photos immediately
+  // (refresh() will re-run this too, but we want the cache to start filling
+  // even before the network round-trip finishes).
+  void photos.precacheAll()
 
   // Downloader event fan-out.
   downloader.onProgress((p) => broadcast(EVENTS.downloadProgress, p))

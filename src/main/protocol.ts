@@ -2,18 +2,20 @@ import { app, protocol } from 'electron'
 import { promises as fsp, createReadStream } from 'node:fs'
 import { join, resolve as resolvePath, sep } from 'node:path'
 import { Readable } from 'node:stream'
+import { ensurePhotoCached, photoFilePath } from './photos'
 
 /**
- * Custom protocol that serves downloaded surah audio from disk.
+ * Custom `app://` protocol with two routes:
  *
- * URL shape: `app://audio/<reciter-id>/<NNN>.mp3`
+ *  - `app://audio/<reciter-id>/<NNN>.mp3` — surah audio with full HTTP Range
+ *    support so HTML5 `<audio>` seeking works without re-downloading.
+ *  - `app://photo/<filename>[?from=<url>]` — reciter photo from the photo
+ *    cache; if not on disk yet, fetches from the optional `from` source
+ *    (validated server-side against the manifest's host).
  *
- * Why this exists: HTML5 `<audio>` plays best from URLs that support HTTP
- * Range requests (so seeking works without re-downloading from byte 0).
- * Loading from `file://` does not — Electron blocks it from the renderer
- * anyway under contextIsolation. A custom scheme lets us serve from disk
- * with full Range semantics while keeping a single security boundary at the
- * audio root.
+ * Why this exists at all: Loading from `file://` is blocked from the
+ * renderer under contextIsolation. A custom scheme lets us serve from disk
+ * with proper semantics while keeping a single security boundary per route.
  */
 
 export const APP_SCHEME = 'app'
@@ -100,11 +102,12 @@ export function registerHandler(): void {
 
 async function handleRequest(request: Request): Promise<Response> {
   const url = new URL(request.url)
+  if (url.host === 'audio') return handleAudio(url, request)
+  if (url.host === 'photo') return handlePhoto(url)
+  return new Response('Not Found', { status: 404 })
+}
 
-  // We only serve `app://audio/...` for now. Future hosts (e.g. `app://icons/...`)
-  // can be added here without changing the validation logic for audio.
-  if (url.host !== 'audio') return new Response('Not Found', { status: 404 })
-
+async function handleAudio(url: URL, request: Request): Promise<Response> {
   const parts = url.pathname.split('/').filter(Boolean)
   if (parts.length !== 2) return new Response('Bad Request', { status: 400 })
 
@@ -189,6 +192,62 @@ function rangeNotSatisfiable(size: number): Response {
   return new Response('Range Not Satisfiable', {
     status: 416,
     headers: { 'Content-Range': `bytes */${size}` }
+  })
+}
+
+const PHOTO_MIME: Record<string, string> = {
+  jpg: 'image/jpeg',
+  jpeg: 'image/jpeg',
+  png: 'image/png',
+  webp: 'image/webp',
+  avif: 'image/avif',
+  gif: 'image/gif'
+}
+
+async function handlePhoto(url: URL): Promise<Response> {
+  // app://photo/<filename> — single path segment, validated by photoFilePath.
+  const parts = url.pathname.split('/').filter(Boolean)
+  if (parts.length !== 1) return new Response('Bad Request', { status: 400 })
+  const filename = parts[0]
+  const filePath = photoFilePath(filename)
+  if (!filePath) return new Response('Bad Request', { status: 400 })
+
+  let stat: Awaited<ReturnType<typeof fsp.stat>> | null = null
+  try {
+    stat = await fsp.stat(filePath)
+  } catch {
+    /* not cached — maybe we can fetch */
+  }
+
+  // Lazy fetch: if not on disk, accept a `from=<https-url>` hint and try to
+  // pull it now. `ensurePhotoCached` validates the source against the manifest
+  // host, so an attacker can't use this as an open proxy.
+  if (!stat || !stat.isFile()) {
+    const from = url.searchParams.get('from')
+    if (from) {
+      const ok = await ensurePhotoCached(filename, from)
+      if (ok) {
+        try {
+          stat = await fsp.stat(filePath)
+        } catch {
+          return new Response('Not Found', { status: 404 })
+        }
+      }
+    }
+    if (!stat || !stat.isFile()) return new Response('Not Found', { status: 404 })
+  }
+
+  const ext = filename.split('.').pop()?.toLowerCase() ?? ''
+  const contentType = PHOTO_MIME[ext] ?? 'application/octet-stream'
+
+  return new Response(toWebStream(createReadStream(filePath)), {
+    status: 200,
+    headers: {
+      'Content-Type': contentType,
+      'Content-Length': String(stat.size),
+      // Photos are immutable in practice — same id + same R2 file. Long cache.
+      'Cache-Control': 'public, max-age=2592000'
+    }
   })
 }
 
