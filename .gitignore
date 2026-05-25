@@ -4,3 +4,8 @@ out
 .DS_Store
 .eslintcache
 *.log*
+
+# Local env files — copy .env.example to .env
+.env
+.env.local
+.env.*.local

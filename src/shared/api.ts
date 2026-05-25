@@ -49,6 +49,8 @@ export type StorageUsage = {
 export type AppInfo = {
   version: string
   platform: NodeJS.Platform
+  userDataPath: string
+  audioDir: string
 }
 
 export interface QuranDeskAPI {
@@ -93,6 +95,15 @@ export interface QuranDeskAPI {
     (event: 'update:status', cb: (s: UpdateStatus) => void): () => void
   }
 }
+
+// Channel names for renderer→main events that go via `webContents.send`.
+// Kept separate from IPC (which is invoke/handle) so the direction is obvious.
+export const EVENTS = {
+  downloadProgress: 'download:progress',
+  downloadCompleted: 'download:completed',
+  manifestUpdated: 'manifest:updated',
+  updateStatus: 'update:status'
+} as const
 
 // Channel names used over `ipcRenderer.invoke`. Listed once so main + preload + tests stay in sync.
 export const IPC = {

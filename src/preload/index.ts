@@ -13,12 +13,14 @@ const api: QuranDeskAPI = {
   getAppInfo: () => ipcRenderer.invoke(IPC.getAppInfo),
   ping: () => ipcRenderer.invoke(IPC.ping),
 
-  // Stubs — Phase 3+ will wire these on the main side.
-  getReciters: notImplemented('getReciters'),
-  refreshManifest: notImplemented('refreshManifest'),
-  getManifestStatus: notImplemented('getManifestStatus'),
-  getSurahDownloads: notImplemented('getSurahDownloads'),
-  getAudioUrl: notImplemented('getAudioUrl'),
+  // Catalog
+  getReciters: () => ipcRenderer.invoke(IPC.getReciters),
+  refreshManifest: () => ipcRenderer.invoke(IPC.refreshManifest),
+  getManifestStatus: () => ipcRenderer.invoke(IPC.getManifestStatus),
+
+  // Stubs — populated by later phases.
+  getSurahDownloads: (reciterId) => ipcRenderer.invoke(IPC.getSurahDownloads, reciterId),
+  getAudioUrl: (reciterId, surah) => ipcRenderer.invoke(IPC.getAudioUrl, reciterId, surah),
   downloadSurah: notImplemented('downloadSurah'),
   downloadReciter: notImplemented('downloadReciter'),
   cancelDownload: notImplemented('cancelDownload'),
