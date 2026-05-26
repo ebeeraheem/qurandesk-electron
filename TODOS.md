@@ -150,9 +150,11 @@ Legend: ✅ done · 🚧 in progress · ⬜ not started
 
 ## Phase 12 — Polish
 
-- ⬜ Empty states, offline banner, error toasts
-- ⬜ Audio-file-missing recovery (row reverts to `not_downloaded` + toast)
-- ⬜ Accessibility pass (focus rings, ARIA labels, keyboard reachability for primary controls)
+- ✅ Empty states already in place from earlier phases (no offline banner — removed by request)
+- ✅ **Toast system** — `stores/toasts.ts` (queue + auto-dismiss) + `<Toaster />` (bottom-right, parked above the player bar). `pushToast({ kind, message, durationMs? })` from anywhere. Reused from `download:reverted` events; surface available for future polish
+- ✅ **Audio-file-missing recovery** — `notifyFileMissing` in downloader.ts DELETEs the orphaned row and emits `download:progress (not_downloaded)` + `download:reverted`. `getAudioUrl` IPC checks for DB-vs-disk drift on every play attempt. Toast surfaces "<Surah> was missing from disk. Removed from your library." Catalog + ReciterDetail rows revert automatically via the existing downloads-store flow
+- ✅ **Boot-time reconciliation** extended — `reconcileFilesystem` now also DELETEs rows whose files have vanished (silent at boot — the user hasn't done anything yet). Insert pass + delete pass run sequentially
+- ✅ **Focus-visible ring** — one global `:focus-visible { outline: 2px solid primary !important; outline-offset: 2px }` in `main.css`. Overrides Tailwind's `focus:outline-none` utility (which intentionally strips mouse-click outlines but shouldn't strip keyboard focus indicators). Single-line a11y baseline that covers every focusable element
 
 ---
 

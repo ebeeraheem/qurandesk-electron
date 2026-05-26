@@ -112,18 +112,28 @@ export function buildReciterSummary(r: RemoteReciter): ReciterSummary {
 }
 
 /**
- * Walk the audio directory once on boot and INSERT a `downloads` row for any
- * surah file that the DB doesn't know about. Lets users who pre-populated
- * the audio folder (e.g. during Phase 2 testing) see those files reflected
- * in the UI without forcing a re-download.
+ * Two-way boot-time reconciliation between the `downloads` table and disk:
+ *
+ *  1. Files present that the DB doesn't know about → INSERT a row (lets
+ *     hand-placed audio show up; also catches files we wrote successfully
+ *     but didn't get a chance to record before a crash).
+ *  2. Rows present that the file is no longer there → DELETE the row
+ *     (handles external deletion / corruption / a wiped audio folder).
+ *
+ * Step 2 runs silently — no toast at boot, since the user hasn't done
+ * anything yet. The on-play reconciliation in `getAudioUrl` is where the
+ * user-facing toast lives, for the case where a file goes missing during a
+ * running session.
  */
 export async function reconcileFilesystem(): Promise<void> {
   const root = getAudioRoot()
+
+  // Step 1: insert files we find on disk that the DB doesn't know about.
   let reciterDirs: string[]
   try {
     reciterDirs = await fsp.readdir(root)
   } catch {
-    return
+    reciterDirs = []
   }
 
   const insert = getDb().prepare(
@@ -157,5 +167,20 @@ export async function reconcileFilesystem(): Promise<void> {
       }
       insert.run(reciterId, n, full, size, Date.now())
     }
+  }
+
+  // Step 2: delete rows whose files are no longer on disk.
+  const rows = getDb()
+    .prepare('SELECT reciter_id, surah_number, file_path FROM downloads')
+    .all() as Array<{ reciter_id: string; surah_number: number; file_path: string }>
+  const remove = getDb().prepare('DELETE FROM downloads WHERE reciter_id = ? AND surah_number = ?')
+  for (const r of rows) {
+    try {
+      const stat = await fsp.stat(r.file_path)
+      if (stat.isFile() && stat.size > 0) continue
+    } catch {
+      /* fall through to remove */
+    }
+    remove.run(r.reciter_id, r.surah_number)
   }
 }

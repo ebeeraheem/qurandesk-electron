@@ -10,6 +10,7 @@ import Settings from './routes/Settings'
 import Welcome from './routes/Welcome'
 import NowPlaying from './routes/NowPlaying'
 import UpdateBanner from './components/UpdateBanner'
+import Toaster from './components/Toaster'
 
 type Gate = { kind: 'checking' } | { kind: 'welcome' } | { kind: 'app' }
 
@@ -50,6 +51,7 @@ export default function App(): React.JSX.Element {
       </div>
       <BottomBar />
       <AudioEngine />
+      <Toaster />
     </div>
   )
 }

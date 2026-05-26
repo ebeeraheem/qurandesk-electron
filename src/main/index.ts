@@ -95,7 +95,14 @@ function registerIpcHandlers(): void {
     const r = validateReciterId(reciterId)
     const s = validateSurah(surah)
     const exists = await audioFileIfExists(r, s)
-    return exists ? audioUrl(r, s) : null
+    if (exists) return audioUrl(r, s)
+    // File isn't on disk. If the DB thinks it is, reconcile — fires events
+    // that flip the row state in the renderer and surface a toast.
+    const dbHasIt = !!getDb()
+      .prepare('SELECT 1 FROM downloads WHERE reciter_id = ? AND surah_number = ?')
+      .get(r, s)
+    if (dbHasIt) downloader.notifyFileMissing(r, s)
+    return null
   })
 
   // Catalog.
@@ -202,6 +209,7 @@ app.whenReady().then(async () => {
   // Downloader event fan-out.
   downloader.onProgress((p) => broadcast(EVENTS.downloadProgress, p))
   downloader.onCompleted((p) => broadcast(EVENTS.downloadCompleted, p))
+  downloader.onReverted((p) => broadcast(EVENTS.downloadReverted, p))
 
   // Boot the downloader: demote leftover 'active' rows + resume queue.
   downloader.recoverFromCrash()

@@ -130,6 +130,10 @@ export interface QuranDeskAPI {
   on: {
     (event: 'download:progress', cb: (p: SurahDownload) => void): () => void
     (event: 'download:completed', cb: (p: { reciterId: string; surah: number }) => void): () => void
+    (
+      event: 'download:reverted',
+      cb: (p: { reciterId: string; surahNumber: number }) => void
+    ): () => void
     (event: 'manifest:updated', cb: () => void): () => void
     (event: 'update:status', cb: (s: UpdateStatus) => void): () => void
   }
@@ -140,6 +144,8 @@ export interface QuranDeskAPI {
 export const EVENTS = {
   downloadProgress: 'download:progress',
   downloadCompleted: 'download:completed',
+  /** Fires when the downloader detects a row whose file vanished from disk. */
+  downloadReverted: 'download:reverted',
   manifestUpdated: 'manifest:updated',
   updateStatus: 'update:status'
 } as const

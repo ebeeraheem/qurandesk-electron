@@ -70,12 +70,42 @@ export function onCompleted(cb: (p: { reciterId: string; surah: number }) => voi
   return () => events.off('completed', cb)
 }
 
+export function onReverted(
+  cb: (p: { reciterId: string; surahNumber: number }) => void
+): () => void {
+  events.on('reverted', cb)
+  return () => events.off('reverted', cb)
+}
+
 function emitProgress(p: SurahDownload): void {
   events.emit('progress', p)
 }
 
 function emitCompleted(reciterId: string, surah: number): void {
   events.emit('completed', { reciterId, surah })
+}
+
+/**
+ * Called from the `getAudioUrl` IPC handler when the DB says a surah is
+ * downloaded but the file is no longer on disk. Removes the orphaned row and
+ * notifies the renderer so it can surface a toast + flip the row state back
+ * to `not_downloaded`.
+ */
+export function notifyFileMissing(reciterId: string, surahNumber: number): void {
+  const result = getDb()
+    .prepare('DELETE FROM downloads WHERE reciter_id = ? AND surah_number = ?')
+    .run(reciterId, surahNumber)
+  if (result.changes === 0) return
+  // Flip the row state for live UI (cards, surah row).
+  emitProgress({
+    reciterId,
+    surahNumber,
+    status: 'not_downloaded',
+    progressBytes: 0,
+    totalBytes: 0
+  })
+  // And let the toast layer know exactly what happened.
+  events.emit('reverted', { reciterId, surahNumber })
 }
 
 // ---------------------------------------------------------------------------

@@ -9,11 +9,13 @@ import { initDownloadsBridge } from './stores/downloads'
 import { initSettings } from './stores/settings'
 import { initPendingTrackBridge, restoreLastPlayback } from './audioEngine'
 import { initUpdaterBridge } from './stores/updater'
+import { initToastsBridge } from './stores/toasts'
 
 // Resolve persisted theme before first paint so we don't flash the wrong palette.
 initTheme()
 initDownloadsBridge()
 initUpdaterBridge()
+initToastsBridge()
 
 // Settings → restore-last-playback. The order matters: the player consults
 // `settings.defaultPlaybackSpeed` while restoring.
