@@ -6,16 +6,16 @@ A quiet listening room for complete Qur'an recitations. Cross-platform desktop a
 
 ## Stack
 
-| Concern | Choice |
-|---|---|
-| Runtime | Electron 39 |
-| Build | electron-vite 5 + Vite 7 |
-| UI | React 19 + TypeScript |
-| Styling | Tailwind CSS v4 (CSS-first `@theme`) |
-| State | Zustand |
-| Router | react-router-dom 7 (`HashRouter`) |
-| Storage | better-sqlite3 (WAL) |
-| Auto-update | electron-updater → GitHub Releases |
+| Concern     | Choice                               |
+| ----------- | ------------------------------------ |
+| Runtime     | Electron 39                          |
+| Build       | electron-vite 5 + Vite 7             |
+| UI          | React 19 + TypeScript                |
+| Styling     | Tailwind CSS v4 (CSS-first `@theme`) |
+| State       | Zustand                              |
+| Router      | react-router-dom 7 (`HashRouter`)    |
+| Storage     | better-sqlite3 (WAL)                 |
+| Auto-update | electron-updater → GitHub Releases   |
 
 ## Develop
 
@@ -41,7 +41,7 @@ npm run build:linux  # AppImage + deb
 Local mac builds skip notarization by default (the YAML's `mac.notarize: false`); CI overrides it on tag pushes. To force a notarized local build, run:
 
 ```sh
-npx electron-builder --mac --arch universal -c.mac.notarize=true
+npx electron-builder --mac --universal -c.mac.notarize=true
 ```
 
 …with `CSC_LINK`, `CSC_KEY_PASSWORD`, `APPLE_ID`, `APPLE_APP_SPECIFIC_PASSWORD`, and `APPLE_TEAM_ID` set in your env.
@@ -60,16 +60,16 @@ The Release lands as a **draft** — verify the artifacts before promoting it; o
 
 ### Required GitHub Secrets
 
-| Secret | When | What |
-|---|---|---|
-| `GITHUB_TOKEN` | always | Provided automatically by Actions |
-| `MAC_CERT_BASE64` | mac signing | base64-encoded Developer ID Application `.p12` |
-| `MAC_CERT_PASSWORD` | mac signing | Password for the `.p12` |
-| `APPLE_ID` | notarization | Apple ID email |
-| `APPLE_APP_SPECIFIC_PASSWORD` | notarization | App-specific password ([create here](https://appleid.apple.com/)) |
-| `APPLE_TEAM_ID` | notarization | 10-char team id from developer.apple.com |
-| `WIN_CSC_LINK` | win signing (optional, v1 ships unsigned) | base64-encoded `.pfx` cert |
-| `WIN_CSC_KEY_PASSWORD` | win signing | Password for the `.pfx` |
+| Secret                        | When                                      | What                                                              |
+| ----------------------------- | ----------------------------------------- | ----------------------------------------------------------------- |
+| `GITHUB_TOKEN`                | always                                    | Provided automatically by Actions                                 |
+| `MAC_CERT_BASE64`             | mac signing                               | base64-encoded Developer ID Application `.p12`                    |
+| `MAC_CERT_PASSWORD`           | mac signing                               | Password for the `.p12`                                           |
+| `APPLE_ID`                    | notarization                              | Apple ID email                                                    |
+| `APPLE_APP_SPECIFIC_PASSWORD` | notarization                              | App-specific password ([create here](https://appleid.apple.com/)) |
+| `APPLE_TEAM_ID`               | notarization                              | 10-char team id from developer.apple.com                          |
+| `WIN_CSC_LINK`                | win signing (optional, v1 ships unsigned) | base64-encoded `.pfx` cert                                        |
+| `WIN_CSC_KEY_PASSWORD`        | win signing                               | Password for the `.pfx`                                           |
 
 ## Project layout
 

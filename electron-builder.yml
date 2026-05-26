@@ -1,4 +1,4 @@
-appId: app.qurandesk
+appId: com.ebeesolutions.qurandesk
 productName: QuranDesk
 directories:
   buildResources: build

@@ -21,8 +21,7 @@ jobs:
         include:
           - os: macos-latest
           - os: windows-latest
-          # Linux deferred — uncomment when ready to ship .AppImage / .deb.
-          # - os: ubuntu-latest
+          - os: ubuntu-latest
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
@@ -43,7 +42,7 @@ jobs:
       # leak into release builds.
       - name: Package & publish (macOS)
         if: matrix.os == 'macos-latest'
-        run: npx electron-builder --mac --arch universal --publish always -c.mac.notarize=true
+        run: npx electron-builder --mac --universal --publish always -c.mac.notarize=true
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           # Developer ID Application cert exported as base64-encoded .p12
@@ -70,3 +69,11 @@ jobs:
         run: npx electron-builder --linux --publish always
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      # Linux AppImage artifacts aren't always correctly marked executable by
+      # electron-builder, so set that explicitly in a follow-up step.
+      # This is needed for them to run at all and for auto-updates to work
+      # (AppImageUpdate uses the AppImageUpdate-zsyncmake helper, which needs to execute the AppImage to extract the embedded zsync data).
+      - name: Mark Linux AppImage executable
+        if: matrix.os == 'ubuntu-latest'
+        run: chmod +x dist/*.AppImage
