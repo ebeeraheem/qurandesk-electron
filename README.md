@@ -41,10 +41,12 @@ npm run build:linux  # AppImage + deb
 Local mac builds skip notarization by default (the YAML's `mac.notarize: false`); CI overrides it on tag pushes. To force a notarized local build, run:
 
 ```sh
-npx electron-builder --mac --universal -c.mac.notarize=true
+npx electron-builder --mac --arch=arm64 -c.mac.notarize=true
 ```
 
 …with `CSC_LINK`, `CSC_KEY_PASSWORD`, `APPLE_ID`, `APPLE_APP_SPECIFIC_PASSWORD`, and `APPLE_TEAM_ID` set in your env.
+
+> **Mac is arm64-only for v1.** Universal binaries don't merge cleanly with `better-sqlite3`'s native module out of the box. To add Intel (x64) support, add a `macos-13` runner to the release matrix building `--arch=x64`; you'll then need to handle the parallel `latest-mac.yml` write race (simplest: run the two mac jobs sequentially with `needs:`).
 
 ## Release flow
 
