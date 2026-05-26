@@ -17,11 +17,11 @@ let wired = false
 export function initUpdaterBridge(): void {
   if (wired) return
   wired = true
-  window.api.on('update:status', (s) => {
+  globalThis.api.on('update:status', (s) => {
     useUpdaterStore.setState({ status: s })
   })
   // Trigger an initial check; main will broadcast the resulting status.
-  void window.api
+  globalThis.api
     .checkForUpdates()
     .then((s) => useUpdaterStore.setState({ status: s }))
     .catch(() => undefined)

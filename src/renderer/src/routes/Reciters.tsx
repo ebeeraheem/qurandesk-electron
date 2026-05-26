@@ -15,17 +15,23 @@ export default function Reciters(): React.JSX.Element {
   const [loaded, setLoaded] = useState(false)
 
   const reload = async (): Promise<void> => {
-    const [list, s] = await Promise.all([window.api.getReciters(), window.api.getManifestStatus()])
+    const [list, s] = await Promise.all([
+      globalThis.api.getReciters(),
+      globalThis.api.getManifestStatus()
+    ])
     setReciters(list)
     setStatus(s)
     setLoaded(true)
   }
 
   useEffect(() => {
+    // Fetch-on-mount + subscribe-to-events. Two separate concerns sharing one
+    // effect; both genuinely belong here.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     void reload()
-    const off1 = window.api.on('manifest:updated', () => void reload())
+    const off1 = globalThis.api.on('manifest:updated', () => void reload())
     // Re-fetch reciter list when a download completes so badge counts stay live.
-    const off2 = window.api.on('download:completed', () => void reload())
+    const off2 = globalThis.api.on('download:completed', () => void reload())
     return () => {
       off1()
       off2()
@@ -82,10 +88,10 @@ export default function Reciters(): React.JSX.Element {
 function SearchInput({
   value,
   onChange
-}: {
+}: Readonly<{
   value: string
   onChange: (v: string) => void
-}): React.JSX.Element {
+}>): React.JSX.Element {
   return (
     <label className="flex w-72 items-center gap-2 rounded-full border border-border bg-bg-elev px-4 py-2 text-sm focus-within:border-primary">
       <svg
@@ -128,10 +134,10 @@ function SearchInput({
 function EmptyOrError({
   lastError,
   onRetry
-}: {
+}: Readonly<{
   lastError: string | null
   onRetry: () => void
-}): React.JSX.Element {
+}>): React.JSX.Element {
   return (
     <div className="grid place-items-center rounded-xl border border-border bg-bg-elev px-6 py-16 text-center">
       <div className="text-sm font-semibold text-fg">Couldn&apos;t load the catalog</div>

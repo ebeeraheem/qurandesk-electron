@@ -14,17 +14,20 @@ export default function Downloads(): React.JSX.Element {
 
   const reload = async (): Promise<void> => {
     const [list, u] = await Promise.all([
-      window.api.getReciters(),
-      window.api.getStorageUsage().catch(() => null)
+      globalThis.api.getReciters(),
+      globalThis.api.getStorageUsage().catch(() => null)
     ])
     setReciters(list)
     setUsage(u)
   }
 
   useEffect(() => {
+    // Fetch-on-mount + subscribe-to-events. The store updates inside reload()
+    // are exactly the synchronisation the effect exists to perform.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     void reload()
-    const off1 = window.api.on('manifest:updated', () => void reload())
-    const off2 = window.api.on('download:completed', () => void reload())
+    const off1 = globalThis.api.on('manifest:updated', () => void reload())
+    const off2 = globalThis.api.on('download:completed', () => void reload())
     return () => {
       off1()
       off2()
@@ -79,8 +82,8 @@ export default function Downloads(): React.JSX.Element {
           <div className="app-no-drag flex items-center gap-2">
             <button
               onClick={() => {
-                if (paused) void window.api.resumeAll()
-                else void window.api.pauseAll()
+                if (paused) globalThis.api.resumeAll()
+                else globalThis.api.pauseAll()
                 useDownloadsStore.setState({ paused: !paused })
               }}
               className="rounded-full border border-border bg-bg-elev px-4 py-1.5 text-xs font-semibold text-muted hover:text-fg"
@@ -150,10 +153,10 @@ export default function Downloads(): React.JSX.Element {
 function Section({
   title,
   children
-}: {
+}: Readonly<{
   title: string
   children: React.ReactNode
-}): React.JSX.Element {
+}>): React.JSX.Element {
   return (
     <section className="mt-6">
       <div className="mb-2 text-[10px] font-semibold uppercase tracking-widest text-faint">
@@ -185,11 +188,11 @@ function ActiveReciterCard({
   reciter,
   reciterId,
   entries
-}: {
+}: Readonly<{
   reciter: ReciterSummary | undefined
   reciterId: string
   entries: QueueEntry[]
-}): React.JSX.Element {
+}>): React.JSX.Element {
   const active = entries.find((e) => e.status === 'active')
   const queued = entries.filter((e) => e.status === 'queued')
   const failed = entries.filter((e) => e.status === 'failed')
@@ -258,10 +261,8 @@ function ActiveReciterCard({
                   </span>
                 </span>
               </>
-            ) : queued.length > 0 ? (
-              <span>{queued.length} queued</span>
             ) : (
-              <span>—</span>
+              <>{queued.length > 0 ? <span>{queued.length} queued</span> : <span>—</span>}</>
             )}
             {failed.length > 0 && <span className="text-danger">· {failed.length} failed</span>}
           </div>
@@ -271,7 +272,7 @@ function ActiveReciterCard({
           onClick={() => {
             // Cancel every in-flight surah for this reciter.
             for (const e of entries) {
-              void window.api.cancelDownload(e.reciterId, e.surahNumber)
+              globalThis.api.cancelDownload(e.reciterId, e.surahNumber)
             }
           }}
           aria-label="Cancel all"
@@ -296,10 +297,10 @@ function ActiveReciterCard({
 function FailedRow({
   entry,
   reciter
-}: {
+}: Readonly<{
   entry: QueueEntry
   reciter: ReciterSummary | undefined
-}): React.JSX.Element {
+}>): React.JSX.Element {
   const surah = getSurah(entry.surahNumber)
   return (
     <li className="flex items-center gap-3 px-5 py-3">
@@ -321,16 +322,16 @@ function FailedRow({
       <div className="flex shrink-0 gap-2">
         <button
           onClick={() =>
-            void window.api
+            globalThis.api
               .cancelDownload(entry.reciterId, entry.surahNumber)
-              .then(() => window.api.downloadSurah(entry.reciterId, entry.surahNumber))
+              .then(() => globalThis.api.downloadSurah(entry.reciterId, entry.surahNumber))
           }
           className="rounded-full bg-warning/15 px-3 py-1 text-xs font-semibold text-warning hover:bg-warning/25"
         >
           Retry
         </button>
         <button
-          onClick={() => void window.api.cancelDownload(entry.reciterId, entry.surahNumber)}
+          onClick={() => globalThis.api.cancelDownload(entry.reciterId, entry.surahNumber)}
           className="rounded-full bg-bg px-3 py-1 text-xs font-semibold text-muted hover:text-fg"
         >
           Remove
@@ -345,12 +346,12 @@ function ReciterLine({
   subtitle,
   badge,
   badgeTone
-}: {
+}: Readonly<{
   reciter: ReciterSummary
   subtitle?: string
   badge?: string
   badgeTone?: 'success'
-}): React.JSX.Element {
+}>): React.JSX.Element {
   return (
     <li className="flex items-center gap-3 px-5 py-3">
       <ReciterAvatar reciter={reciter} className="h-10 w-10 shrink-0" />
@@ -371,7 +372,7 @@ function ReciterLine({
         </span>
       )}
       <button
-        onClick={() => void window.api.deleteReciter(reciter.id)}
+        onClick={() => globalThis.api.deleteReciter(reciter.id)}
         title="Delete all downloaded surahs for this reciter"
         aria-label="Delete downloads"
         className="grid size-8 shrink-0 place-items-center rounded-full text-muted hover:bg-danger/10 hover:text-danger"

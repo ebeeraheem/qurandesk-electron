@@ -35,15 +35,15 @@ export default function ConfirmDownloadDialog({
   totalBytes,
   onClose,
   onConfirm
-}: Props): React.JSX.Element | null {
+}: Readonly<Props>): React.JSX.Element | null {
   useEffect(() => {
     if (!open) return
     const onKey = (e: KeyboardEvent): void => {
       if (e.key === 'Escape') onClose()
       if (e.key === 'Enter' && state !== 'insufficient') onConfirm()
     }
-    window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
+    globalThis.addEventListener('keydown', onKey)
+    return () => globalThis.removeEventListener('keydown', onKey)
   })
 
   if (!open) return null
@@ -53,9 +53,8 @@ export default function ConfirmDownloadDialog({
 
   let state: 'insufficient' | 'tight' | 'ok' | 'unknown' = 'ok'
   if (!known) state = 'unknown'
-  else if (haveEstimate && estimatedBytes! > freeBytes! - SAFETY_MARGIN_BYTES)
-    state = 'insufficient'
-  else if (haveEstimate && estimatedBytes! > freeBytes! - 5 * SAFETY_MARGIN_BYTES) state = 'tight'
+  else if (haveEstimate && estimatedBytes > freeBytes - SAFETY_MARGIN_BYTES) state = 'insufficient'
+  else if (haveEstimate && estimatedBytes > freeBytes - 5 * SAFETY_MARGIN_BYTES) state = 'tight'
 
   return (
     <div
@@ -78,9 +77,9 @@ export default function ConfirmDownloadDialog({
         <div className="mt-5 space-y-2 rounded-lg border border-border bg-bg-elev px-4 py-3 text-sm">
           <Row
             label="Download size"
-            value={haveEstimate ? `~${formatBytes(estimatedBytes!)}` : '—'}
+            value={haveEstimate ? `~${formatBytes(estimatedBytes)}` : '—'}
           />
-          <Row label="Free disk" value={known ? formatBytes(freeBytes!) : '—'} />
+          <Row label="Free disk" value={known ? formatBytes(freeBytes) : '—'} />
           {totalBytes && totalBytes > 0 && (
             <Row label="Total disk" value={formatBytes(totalBytes)} muted />
           )}
@@ -123,7 +122,7 @@ export default function ConfirmDownloadDialog({
               autoFocus
               className="rounded-full bg-primary px-5 py-2 text-sm font-semibold text-white shadow-sm hover:opacity-90"
             >
-              {haveEstimate ? `Download ~${formatBytes(estimatedBytes!)}` : 'Download'}
+              {haveEstimate ? `Download ~${formatBytes(estimatedBytes)}` : 'Download'}
             </button>
           )}
         </div>
@@ -136,11 +135,11 @@ function Row({
   label,
   value,
   muted = false
-}: {
+}: Readonly<{
   label: string
   value: string
   muted?: boolean
-}): React.JSX.Element {
+}>): React.JSX.Element {
   return (
     <div
       className={['flex justify-between gap-4', muted && 'text-muted'].filter(Boolean).join(' ')}

@@ -26,6 +26,7 @@ const RESOURCES_DIR = join(ROOT, 'resources')
 
 const TARGET_SIZE = 1024
 
+/** @returns {Buffer} */
 function renderPng(svg, size) {
   const resvg = new Resvg(svg, {
     fitTo: { mode: 'width', value: size },
@@ -34,6 +35,7 @@ function renderPng(svg, size) {
   return resvg.render().asPng()
 }
 
+/** @returns {Promise<void>} */
 async function main() {
   const svg = await readFile(SVG_PATH)
   const png = renderPng(svg, TARGET_SIZE)

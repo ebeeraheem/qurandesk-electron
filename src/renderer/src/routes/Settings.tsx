@@ -10,7 +10,7 @@ const THEMES: Array<{ value: ThemePreference; label: string }> = [
   { value: 'dark', label: 'Dark' }
 ]
 
-const SPEEDS: PlaybackSpeed[] = [0.75, 1.0, 1.25, 1.5]
+const SPEEDS: PlaybackSpeed[] = [0.75, 1, 1.25, 1.5]
 
 const AUTO_ADVANCE: Array<{ value: AutoAdvanceMode; label: string; sub: string }> = [
   {
@@ -35,13 +35,13 @@ export default function Settings(): React.JSX.Element {
   const [refreshing, setRefreshing] = useState(false)
 
   useEffect(() => {
-    void window.api
+    globalThis.api
       .getAppInfo()
       .then(setAppInfo)
       .catch(() => undefined)
-    void window.api.getManifestStatus().then(setManifestStatus)
-    const off = window.api.on('manifest:updated', () => {
-      void window.api.getManifestStatus().then(setManifestStatus)
+    globalThis.api.getManifestStatus().then(setManifestStatus)
+    const off = globalThis.api.on('manifest:updated', () => {
+      globalThis.api.getManifestStatus().then(setManifestStatus)
     })
     return off
   }, [])
@@ -49,7 +49,7 @@ export default function Settings(): React.JSX.Element {
   const onRefresh = async (): Promise<void> => {
     setRefreshing(true)
     try {
-      await window.api.refreshManifest()
+      await globalThis.api.refreshManifest()
     } finally {
       setRefreshing(false)
     }
@@ -116,7 +116,7 @@ export default function Settings(): React.JSX.Element {
                 {appInfo?.audioDir ?? '—'}
               </code>
               <button
-                onClick={() => void window.api.revealDownloadsFolder()}
+                onClick={() => globalThis.api.revealDownloadsFolder()}
                 className="rounded-md border border-border bg-bg-elev px-3 py-1.5 text-xs font-semibold text-muted hover:text-fg"
               >
                 Show in Explorer
@@ -178,7 +178,7 @@ function UpdateRow(): React.JSX.Element {
   const onCheck = async (): Promise<void> => {
     setChecking(true)
     try {
-      await window.api.checkForUpdates()
+      await globalThis.api.checkForUpdates()
     } finally {
       setChecking(false)
     }
@@ -206,7 +206,7 @@ function UpdateRow(): React.JSX.Element {
       control={
         status.status === 'ready' ? (
           <button
-            onClick={() => void window.api.installUpdateOnQuit()}
+            onClick={() => globalThis.api.installUpdateOnQuit()}
             className="rounded-full bg-primary px-4 py-1.5 text-xs font-semibold text-white hover:opacity-90"
           >
             Restart to install
@@ -232,10 +232,10 @@ function UpdateRow(): React.JSX.Element {
 function Section({
   title,
   children
-}: {
+}: Readonly<{
   title: string
   children: React.ReactNode
-}): React.JSX.Element {
+}>): React.JSX.Element {
   return (
     <section className="mt-6">
       <div className="mb-2 text-[10px] font-semibold uppercase tracking-widest text-faint">
@@ -252,11 +252,11 @@ function Row({
   label,
   sub,
   control
-}: {
+}: Readonly<{
   label: string
   sub?: string
   control: React.ReactNode
-}): React.JSX.Element {
+}>): React.JSX.Element {
   return (
     <div className="flex items-center justify-between gap-6 px-5 py-4">
       <div className="min-w-0">
@@ -272,11 +272,11 @@ function SegmentedControl<T extends string | number>({
   options,
   value,
   onChange
-}: {
+}: Readonly<{
   options: Array<{ value: T; label: string }>
   value: T
   onChange: (v: T) => void
-}): React.JSX.Element {
+}>): React.JSX.Element {
   return (
     <div className="flex rounded-full bg-bg p-1">
       {options.map((opt) => {

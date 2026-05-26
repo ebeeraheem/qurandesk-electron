@@ -28,5 +28,14 @@ export default defineConfig(
       ...eslintPluginReactRefresh.configs.vite.rules
     }
   },
+  // Plain-JS build scripts (eg. scripts/build-icons.mjs) shouldn't be held to
+  // TypeScript-only rules. JSDoc annotations cover the cases we care about.
+  {
+    files: ['scripts/**/*.{js,mjs,cjs}'],
+    rules: {
+      '@typescript-eslint/explicit-function-return-type': 'off',
+      '@typescript-eslint/explicit-module-boundary-types': 'off'
+    }
+  },
   eslintConfigPrettier
 )

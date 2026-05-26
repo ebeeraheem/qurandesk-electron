@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 
-export type PlaybackSpeedValue = 0.75 | 1.0 | 1.25 | 1.5
+export type PlaybackSpeedValue = 0.75 | 1 | 1.25 | 1.5
 
 export type PlayerStatus = 'idle' | 'loading' | 'playing' | 'paused' | 'ended' | 'error'
 
@@ -32,7 +32,7 @@ export const usePlayerStore = create<PlayerState>(() => ({
   status: 'idle',
   position: 0,
   duration: 0,
-  speed: 1.0,
+  speed: 1,
   errorMessage: null,
   pendingTrack: null
 }))

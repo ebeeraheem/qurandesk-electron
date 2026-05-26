@@ -20,10 +20,10 @@ const ALLOWED_EXT = new Set(['jpg', 'jpeg', 'png', 'webp', 'avif', 'gif'])
 export default function ReciterAvatar({
   reciter,
   className = ''
-}: {
+}: Readonly<{
   reciter: ReciterSummary
   className?: string
-}): React.JSX.Element {
+}>): React.JSX.Element {
   const [errored, setErrored] = useState(false)
   const src = errored ? null : photoSrc(reciter)
 
@@ -68,7 +68,7 @@ function photoSrc(reciter: ReciterSummary): string | null {
   return `app://photo/${reciter.id}.${ext}?from=${encodeURIComponent(reciter.photoUrl)}`
 }
 
-function PlaceholderArt({ reciter }: { reciter: ReciterSummary }): React.JSX.Element {
+function PlaceholderArt({ reciter }: Readonly<{ reciter: ReciterSummary }>): React.JSX.Element {
   const hue = hashToHue(reciter.id)
   const letter = firstLetter(reciter.name)
   const gradientId = `reciter-grad-${reciter.id}`
@@ -107,7 +107,7 @@ function PlaceholderArt({ reciter }: { reciter: ReciterSummary }): React.JSX.Ele
 function hashToHue(id: string): number {
   let h = 0
   for (let i = 0; i < id.length; i++) {
-    h = (h * 31 + id.charCodeAt(i)) | 0
+    h = Math.trunc(h * 31 + (id.codePointAt(i) ?? 0))
   }
   return ((h % 360) + 360) % 360
 }
@@ -115,5 +115,5 @@ function hashToHue(id: string): number {
 function firstLetter(name: string): string {
   const trimmed = name.trim()
   if (!trimmed) return '·'
-  return [...trimmed][0]!.toUpperCase()
+  return [...trimmed][0].toUpperCase()
 }

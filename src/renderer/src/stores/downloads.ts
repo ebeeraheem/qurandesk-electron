@@ -46,7 +46,7 @@ function setReciter(reciterId: string, downloads: SurahDownload[]): void {
 /** Merge a single progress event into the per-reciter map. */
 function applyProgress(p: SurahDownload): void {
   useDownloadsStore.setState((s) => {
-    const map = { ...(s.byReciter[p.reciterId] ?? {}) }
+    const map = { ...s.byReciter[p.reciterId] }
     if (p.status === 'not_downloaded') {
       delete map[p.surahNumber]
     } else {
@@ -77,7 +77,7 @@ function applyProgress(p: SurahDownload): void {
 /** Mark a surah as downloaded — fires after `download:completed`. */
 function applyCompleted({ reciterId, surah }: { reciterId: string; surah: number }): void {
   useDownloadsStore.setState((s) => {
-    const map = { ...(s.byReciter[reciterId] ?? {}) }
+    const map = { ...s.byReciter[reciterId] }
     map[surah] = { reciterId, surahNumber: surah, status: 'downloaded' }
     return {
       byReciter: { ...s.byReciter, [reciterId]: map },
@@ -96,10 +96,12 @@ let wired = false
 export function initDownloadsBridge(): void {
   if (wired) return
   wired = true
-  window.api.on('download:progress', (p) => applyProgress(p))
-  window.api.on('download:completed', (p) => applyCompleted(p))
-  void window.api.isPaused().then((paused) => useDownloadsStore.setState({ paused }))
-  void window.api.getActiveQueue().then((queue) => useDownloadsStore.setState({ queue }))
+  globalThis.api.on('download:progress', (p: SurahDownload) => applyProgress(p))
+  globalThis.api.on('download:completed', (p: { reciterId: string; surah: number }) =>
+    applyCompleted(p)
+  )
+  globalThis.api.isPaused().then((paused) => useDownloadsStore.setState({ paused }))
+  globalThis.api.getActiveQueue().then((queue) => useDownloadsStore.setState({ queue }))
 }
 
 // ---------------------------------------------------------------------------
@@ -113,7 +115,9 @@ export function useReciterDownloads(reciterId: string | undefined): SurahDownloa
 
   useEffect(() => {
     if (!reciterId || hydrated) return
-    void window.api.getSurahDownloads(reciterId).then((d) => setReciter(reciterId, d))
+    globalThis.api
+      .getSurahDownloads(reciterId)
+      .then((d: SurahDownload[]) => setReciter(reciterId, d))
   }, [reciterId, hydrated])
 
   if (!reciterId || !map) {

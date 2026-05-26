@@ -86,12 +86,12 @@ export async function restoreLastPlayback(): Promise<void> {
   const settings = useSettingsStore.getState().settings
   usePlayerStore.setState({ speed: settings.defaultPlaybackSpeed })
 
-  const last = await window.api.getLastPlayback().catch(() => null)
+  const last = await globalThis.api.getLastPlayback().catch(() => null)
   if (!last) return
 
   let reciterName = last.reciterId
   try {
-    const reciters = await window.api.getReciters()
+    const reciters = await globalThis.api.getReciters()
     const match = reciters.find((r) => r.id === last.reciterId)
     if (match) reciterName = match.name
   } catch {
@@ -112,7 +112,7 @@ export async function restoreLastPlayback(): Promise<void> {
 
   // Pre-load so `audioEl.src` is real before the user hits play and so
   // `loadedmetadata` fires (populating duration in the UI).
-  const url = await window.api.getAudioUrl(last.reciterId, last.surahNumber).catch(() => null)
+  const url = await globalThis.api.getAudioUrl(last.reciterId, last.surahNumber).catch(() => null)
   if (url) {
     applySrc(url, last.positionSeconds)
   }
@@ -134,7 +134,7 @@ export async function playTrack(track: CurrentTrack): Promise<void> {
 
   let url: string | null
   try {
-    url = await window.api.getAudioUrl(track.reciterId, track.surahNumber)
+    url = await globalThis.api.getAudioUrl(track.reciterId, track.surahNumber)
   } catch (e) {
     usePlayerStore.setState({
       status: 'error',
@@ -196,7 +196,7 @@ export function setSpeed(speed: PlaybackSpeedValue): void {
   usePlayerStore.setState({ speed })
 }
 
-const SPEED_ORDER: PlaybackSpeedValue[] = [0.75, 1.0, 1.25, 1.5]
+const SPEED_ORDER: PlaybackSpeedValue[] = [0.75, 1, 1.25, 1.5]
 
 export function cycleSpeed(): void {
   const current = usePlayerStore.getState().speed
@@ -271,7 +271,7 @@ export function handleEnded(): void {
       pendingTrack: { ...current, surahNumber: nextNum },
       errorMessage: null
     })
-    void window.api.downloadSurah(current.reciterId, nextNum).catch(() => undefined)
+    globalThis.api.downloadSurah(current.reciterId, nextNum).catch(() => undefined)
   } else {
     usePlayerStore.setState({
       errorMessage: `Next surah isn't downloaded.`
@@ -286,7 +286,7 @@ export function handleEnded(): void {
 export function persistNow(): void {
   const { current, position } = usePlayerStore.getState()
   if (!current) return
-  void window.api
+  globalThis.api
     .setLastPlayback({
       reciterId: current.reciterId,
       surahNumber: current.surahNumber,
@@ -304,7 +304,7 @@ let pendingWired = false
 export function initPendingTrackBridge(): void {
   if (pendingWired) return
   pendingWired = true
-  window.api.on('download:completed', ({ reciterId, surah }) => {
+  globalThis.api.on('download:completed', ({ reciterId, surah }) => {
     const { pendingTrack } = usePlayerStore.getState()
     if (
       pendingTrack &&

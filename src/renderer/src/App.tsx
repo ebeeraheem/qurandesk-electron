@@ -17,9 +17,9 @@ export default function App(): React.JSX.Element {
   const [gate, setGate] = useState<Gate>({ kind: 'checking' })
 
   useEffect(() => {
-    window.api
+    globalThis.api
       .getManifestStatus()
-      .then((s) => setGate({ kind: s.cachedAt !== null ? 'app' : 'welcome' }))
+      .then((s: { cachedAt: null }) => setGate({ kind: s.cachedAt === null ? 'welcome' : 'app' }))
       .catch(() => setGate({ kind: 'welcome' }))
   }, [])
 

@@ -21,7 +21,7 @@ export type SurahDownload = {
 
 export type ThemePreference = 'system' | 'light' | 'dark'
 
-export type PlaybackSpeed = 0.75 | 1.0 | 1.25 | 1.5
+export type PlaybackSpeed = 0.75 | 1 | 1.25 | 1.5
 
 export type AutoAdvanceMode = 'stop' | 'download-then-play'
 
@@ -180,7 +180,7 @@ export const IPC = {
 
 export const DEFAULT_SETTINGS: Settings = {
   theme: 'system',
-  defaultPlaybackSpeed: 1.0,
+  defaultPlaybackSpeed: 1,
   repeatMode: 'off',
   autoAdvanceMode: 'stop'
 }

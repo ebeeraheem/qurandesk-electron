@@ -57,6 +57,8 @@ export default function AudioEngine(): React.JSX.Element {
           errorMessage: 'Audio failed to load.'
         })
       }
-    />
+    >
+      <track kind="captions" />
+    </audio>
   )
 }

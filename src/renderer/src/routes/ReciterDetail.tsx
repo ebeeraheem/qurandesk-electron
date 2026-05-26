@@ -16,17 +16,20 @@ export default function ReciterDetail(): React.JSX.Element {
   const downloads = useReciterDownloads(id)
 
   const reload = async (reciterId: string): Promise<void> => {
-    const list = await window.api.getReciters()
-    const found = list.find((r) => r.id === reciterId) ?? null
+    const list = await globalThis.api.getReciters()
+    const found = list.find((r: { id: string }) => r.id === reciterId) ?? null
     setReciter(found)
     if (!found) setNotFound(true)
   }
 
   useEffect(() => {
     if (!id) return
+    // Fetch-on-mount; the subsequent IPC subscriptions also drive setState in
+    // their callbacks, which is exactly what those events are for.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     void reload(id)
-    const off1 = window.api.on('manifest:updated', () => void reload(id))
-    const off2 = window.api.on('download:completed', () => void reload(id))
+    const off1 = globalThis.api.on('manifest:updated', () => void reload(id))
+    const off2 = globalThis.api.on('download:completed', () => void reload(id))
     return () => {
       off1()
       off2()
@@ -66,7 +69,7 @@ export default function ReciterDetail(): React.JSX.Element {
 
   const openDialog = async (): Promise<void> => {
     try {
-      setUsage(await window.api.getStorageUsage())
+      setUsage(await globalThis.api.getStorageUsage())
     } catch {
       setUsage(null)
     }
@@ -127,7 +130,7 @@ export default function ReciterDetail(): React.JSX.Element {
         onClose={() => setDialogOpen(false)}
         onConfirm={() => {
           setDialogOpen(false)
-          void window.api.downloadReciter(reciter.id)
+          globalThis.api.downloadReciter(reciter.id)
         }}
       />
     </div>
@@ -139,12 +142,12 @@ function AggregateButton({
   inFlight,
   surahsRemaining,
   onClick
-}: {
+}: Readonly<{
   downloadedCount: number
   inFlight: number
   surahsRemaining: number
   onClick: () => void
-}): React.JSX.Element {
+}>): React.JSX.Element {
   if (downloadedCount >= 114) {
     return (
       <div className="flex items-center gap-2 rounded-full bg-success/15 px-4 py-2 text-xs font-semibold text-success">
@@ -171,12 +174,14 @@ function AggregateButton({
     )
   }
 
-  const label =
-    inFlight > 0
-      ? `Add ${surahsRemaining} more`
-      : downloadedCount > 0
-        ? `Resume · ${surahsRemaining} left`
-        : 'Download all 114'
+  let label: string
+  if (inFlight > 0) {
+    label = `Add ${surahsRemaining} more`
+  } else if (downloadedCount > 0) {
+    label = `Resume · ${surahsRemaining} left`
+  } else {
+    label = 'Download all 114'
+  }
 
   return (
     <button

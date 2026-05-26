@@ -34,7 +34,7 @@ export default function UpdateBanner(): React.JSX.Element | null {
     <Bar tone="success">
       <span className="font-semibold">Update {status.version} is ready.</span>
       <button
-        onClick={() => void window.api.installUpdateOnQuit()}
+        onClick={() => globalThis.api.installUpdateOnQuit()}
         className="ml-3 rounded-full bg-fg/90 px-3 py-1 text-xs font-semibold text-bg hover:bg-fg"
       >
         Restart to install
@@ -47,10 +47,10 @@ export default function UpdateBanner(): React.JSX.Element | null {
 function Bar({
   tone,
   children
-}: {
+}: Readonly<{
   tone: 'info' | 'success'
   children: React.ReactNode
-}): React.JSX.Element {
+}>): React.JSX.Element {
   const bg = tone === 'success' ? 'bg-success/15 text-success' : 'bg-bg-tint text-primary'
   return (
     <div className={['flex items-center justify-center px-4 py-2 text-xs', bg].join(' ')}>

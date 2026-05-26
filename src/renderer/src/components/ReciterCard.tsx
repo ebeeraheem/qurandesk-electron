@@ -7,7 +7,7 @@ type Props = {
   onClick: () => void
 }
 
-export default function ReciterCard({ reciter, onClick }: Props): React.JSX.Element {
+export default function ReciterCard({ reciter, onClick }: Readonly<Props>): React.JSX.Element {
   const stateLabel = subtitle(reciter)
   const showPartialBadge = reciter.downloadState === 'partial' && reciter.downloadedSurahs > 0
   const showCompleteCheck = reciter.downloadState === 'complete'

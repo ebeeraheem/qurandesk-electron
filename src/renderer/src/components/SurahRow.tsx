@@ -9,7 +9,11 @@ type Props = {
   reciterName: string
 }
 
-export default function SurahRow({ download, reciterId, reciterName }: Props): React.JSX.Element {
+export default function SurahRow({
+  download,
+  reciterId,
+  reciterName
+}: Readonly<Props>): React.JSX.Element {
   const surah = getSurah(download.surahNumber)
   const current = usePlayerStore((s) => s.current)
   const status = usePlayerStore((s) => s.status)
@@ -100,7 +104,7 @@ export default function SurahRow({ download, reciterId, reciterName }: Props): R
   )
 }
 
-function RowStatus({ download }: { download: SurahDownload }): React.JSX.Element | null {
+function RowStatus({ download }: Readonly<{ download: SurahDownload }>): React.JSX.Element | null {
   switch (download.status) {
     case 'queued':
       return <div className="mt-0.5 text-[11px] text-muted">Queued</div>
@@ -122,11 +126,11 @@ function ActionButton({
   download,
   isPlayingTrack,
   onPlay
-}: {
+}: Readonly<{
   download: SurahDownload
   isPlayingTrack: boolean
   onPlay: (e: React.MouseEvent) => void
-}): React.JSX.Element {
+}>): React.JSX.Element {
   switch (download.status) {
     case 'downloaded':
       return (
@@ -154,7 +158,7 @@ function ActionButton({
         <button
           onClick={(e) => {
             e.stopPropagation()
-            void window.api.cancelDownload(download.reciterId, download.surahNumber)
+            globalThis.api.cancelDownload(download.reciterId, download.surahNumber)
           }}
           className="grid size-8 place-items-center rounded-full bg-bg-elev text-muted hover:bg-danger/10 hover:text-danger"
           aria-label="Cancel download"
@@ -177,9 +181,9 @@ function ActionButton({
         <button
           onClick={(e) => {
             e.stopPropagation()
-            void window.api
+            globalThis.api
               .cancelDownload(download.reciterId, download.surahNumber)
-              .then(() => window.api.downloadSurah(download.reciterId, download.surahNumber))
+              .then(() => globalThis.api.downloadSurah(download.reciterId, download.surahNumber))
           }}
           className="grid size-8 place-items-center rounded-full bg-warning/15 text-warning hover:bg-warning/25"
           aria-label="Retry download"
@@ -205,7 +209,7 @@ function ActionButton({
         <button
           onClick={(e) => {
             e.stopPropagation()
-            void window.api.downloadSurah(download.reciterId, download.surahNumber)
+            globalThis.api.downloadSurah(download.reciterId, download.surahNumber)
           }}
           className="grid size-8 place-items-center rounded-full text-muted hover:bg-primary/10 hover:text-primary"
           aria-label="Download"

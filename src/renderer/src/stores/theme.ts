@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useSyncExternalStore } from 'react'
 import type { ThemePreference } from '@shared/api'
 import { useSettingsStore, updateSettings } from './settings'
 
@@ -11,17 +11,16 @@ import { useSettingsStore, updateSettings } from './settings'
  *    then subscribes to the settings store so subsequent changes propagate.
  *  - `useThemeStore()` is a hook for components — returns `{ preference,
  *    active, setPreference }`. Mutations go through `updateSettings`.
+ *
+ * The OS dark-mode media query is read via `useSyncExternalStore` rather
+ * than `useEffect + useState` so React re-renders consumers automatically
+ * when the OS preference flips, with zero "setState-in-effect" cascade.
  */
 
 const CACHE_KEY = 'qurandesk:theme-cache'
 
-function resolveActive(pref: ThemePreference): 'light' | 'dark' {
-  if (pref === 'system') {
-    return typeof window !== 'undefined' &&
-      window.matchMedia('(prefers-color-scheme: dark)').matches
-      ? 'dark'
-      : 'light'
-  }
+function resolveActive(pref: ThemePreference, osDark: boolean): 'light' | 'dark' {
+  if (pref === 'system') return osDark ? 'dark' : 'light'
   return pref
 }
 
@@ -34,37 +33,62 @@ function readCache(): ThemePreference {
   return raw === 'light' || raw === 'dark' || raw === 'system' ? raw : 'system'
 }
 
+// ---------------------------------------------------------------------------
+// External-store glue for `useSyncExternalStore`. Lives at module scope so
+// every consumer shares the same subscriber list — React handles fan-out.
+// ---------------------------------------------------------------------------
+
+function subscribeToOSScheme(callback: () => void): () => void {
+  if (globalThis.window === undefined) return () => undefined
+  const mq = globalThis.matchMedia('(prefers-color-scheme: dark)')
+  mq.addEventListener('change', callback)
+  return () => mq.removeEventListener('change', callback)
+}
+
+function getOSDark(): boolean {
+  if (globalThis.window === undefined) return false
+  return globalThis.matchMedia('(prefers-color-scheme: dark)').matches
+}
+
+// ---------------------------------------------------------------------------
+// Boot-time init: keep <html> class + localStorage cache in sync with both
+// settings changes and OS scheme changes. No React involvement here — runs
+// before the renderer's first React paint.
+// ---------------------------------------------------------------------------
+
 let initialized = false
 
 export function initTheme(): void {
   if (initialized) return
   initialized = true
 
-  // 1. First paint — use whatever we cached last time.
+  // First paint — use whatever we cached last time.
   const cached = readCache()
-  applyClass(resolveActive(cached))
+  applyClass(resolveActive(cached, getOSDark()))
 
-  // 2. When settings hydrate (and on every subsequent change), apply + cache.
+  // When settings hydrate (and on every subsequent change), apply + cache.
   useSettingsStore.subscribe((state) => {
     const pref = state.settings.theme
     localStorage.setItem(CACHE_KEY, pref)
-    applyClass(resolveActive(pref))
+    applyClass(resolveActive(pref, getOSDark()))
   })
 
-  // 3. Follow OS changes while preference is 'system'.
-  if (typeof window !== 'undefined') {
-    window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => {
-      if (useSettingsStore.getState().settings.theme === 'system') {
-        applyClass(resolveActive('system'))
-      }
+  // Follow OS changes while preference is 'system'.
+  if (globalThis.window !== undefined) {
+    globalThis.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => {
+      const pref = useSettingsStore.getState().settings.theme
+      if (pref === 'system') applyClass(resolveActive('system', getOSDark()))
     })
   }
 }
 
+// ---------------------------------------------------------------------------
+// React hook
+// ---------------------------------------------------------------------------
+
 /**
- * Hook returning the live theme state. Components that just need the active
- * value (light/dark) for an icon can call this; mutations go through
- * `setPreference`.
+ * Returns `{ preference, active, setPreference }`. `active` recomputes
+ * automatically when either the user's preference or the OS scheme flips.
  */
 export function useThemeStore(): {
   preference: ThemePreference
@@ -72,17 +96,8 @@ export function useThemeStore(): {
   setPreference: (p: ThemePreference) => void
 } {
   const preference = useSettingsStore((s) => s.settings.theme)
-  // Track `active` locally so OS preference changes re-render consumers.
-  const [active, setActive] = useState<'light' | 'dark'>(() => resolveActive(preference))
-
-  useEffect(() => {
-    setActive(resolveActive(preference))
-    if (preference !== 'system') return
-    const mq = window.matchMedia('(prefers-color-scheme: dark)')
-    const onChange = (): void => setActive(resolveActive('system'))
-    mq.addEventListener('change', onChange)
-    return () => mq.removeEventListener('change', onChange)
-  }, [preference])
+  const osDark = useSyncExternalStore(subscribeToOSScheme, getOSDark, getOSDark)
+  const active = resolveActive(preference, osDark)
 
   return {
     preference,

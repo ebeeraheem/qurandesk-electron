@@ -38,12 +38,15 @@ export default function NowPlaying(): React.JSX.Element {
     if (!current) navigate('/reciters', { replace: true })
   }, [current, navigate])
 
+  // Extracted so exhaustive-deps tracks the primitive instead of the whole
+  // `current` object (which gets a fresh reference on every store write).
+  const reciterId = current?.reciterId
   useEffect(() => {
-    if (!current) return
+    if (!reciterId) return
     void window.api.getReciters().then((list) => {
-      setReciter(list.find((r) => r.id === current.reciterId) ?? null)
+      setReciter(list.find((r) => r.id === reciterId) ?? null)
     })
-  }, [current?.reciterId])
+  }, [reciterId])
 
   if (!current) return <></>
   const surah = getSurah(current.surahNumber)

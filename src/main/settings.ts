@@ -9,7 +9,7 @@ import { getDb } from './db'
  */
 
 const VALID_THEME = new Set(['system', 'light', 'dark'])
-const VALID_SPEED = new Set([0.75, 1.0, 1.25, 1.5])
+const VALID_SPEED = new Set([0.75, 1, 1.25, 1.5])
 const VALID_MODE = new Set(['stop', 'download-then-play'])
 const VALID_REPEAT = new Set(['off', 'one'])
 

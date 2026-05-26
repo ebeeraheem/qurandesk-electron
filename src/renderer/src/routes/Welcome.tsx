@@ -15,17 +15,17 @@ type Props = {
  * user has launched the app before and we already have a catalog on disk, the
  * gate in App.tsx skips Welcome and goes straight to the catalog.
  */
-export default function Welcome({ onContinue }: Props): React.JSX.Element {
+export default function Welcome({ onContinue }: Readonly<Props>): React.JSX.Element {
   const [phase, setPhase] = useState<Phase>({ kind: 'loading' })
 
   const tryFetch = async (): Promise<void> => {
     setPhase({ kind: 'loading' })
-    const result = await window.api.refreshManifest()
+    const result = await globalThis.api.refreshManifest()
     if (!result.ok) {
       setPhase({ kind: 'error', message: result.error ?? 'Unknown error' })
       return
     }
-    const reciters = await window.api.getReciters()
+    const reciters = await globalThis.api.getReciters()
     setPhase({
       kind: 'ready',
       reciterCount: reciters.length,
@@ -34,6 +34,10 @@ export default function Welcome({ onContinue }: Props): React.JSX.Element {
   }
 
   useEffect(() => {
+    // Fetch-on-mount pattern. The rule's blessed alternatives (Suspense / a
+    // data-fetching library) are oversized for a one-shot IPC call to our
+    // own main process.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     void tryFetch()
   }, [])
 
@@ -74,7 +78,7 @@ export default function Welcome({ onContinue }: Props): React.JSX.Element {
                 className="rounded-full bg-warm px-7 py-3 text-sm font-bold text-fg shadow-sm transition-opacity hover:opacity-90"
               >
                 Continue to your library
-                <span aria-hidden className="ml-2">
+                <span aria-hidden="true" className="ml-2">
                   ›
                 </span>
               </button>

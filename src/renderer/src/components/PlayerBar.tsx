@@ -189,7 +189,9 @@ export default function PlayerBar(): React.JSX.Element {
  * Repeat-mode button. 'off' (default) = sequential play; 'one' = loop the
  * current surah. Skipping 'all' since wrapping 114 → 1 isn't useful here.
  */
-export function RepeatButton({ repeatMode }: { repeatMode: RepeatMode }): React.JSX.Element {
+export function RepeatButton({
+  repeatMode
+}: Readonly<{ repeatMode: RepeatMode }>): React.JSX.Element {
   const isOn = repeatMode === 'one'
   return (
     <button
@@ -210,10 +212,10 @@ export function RepeatButton({ repeatMode }: { repeatMode: RepeatMode }): React.
 export function RepeatIcon({
   repeatOne,
   className = 'size-4'
-}: {
+}: Readonly<{
   repeatOne: boolean
   className?: string
-}): React.JSX.Element {
+}>): React.JSX.Element {
   return (
     <svg
       viewBox="0 0 24 24"
@@ -243,7 +245,7 @@ export function RepeatIcon({
   )
 }
 
-function ExpandButton({ hasTrack }: { hasTrack: boolean }): React.JSX.Element {
+function ExpandButton({ hasTrack }: Readonly<{ hasTrack: boolean }>): React.JSX.Element {
   const navigate = useNavigate()
   return (
     <div className="flex shrink-0 items-center gap-2 text-muted">

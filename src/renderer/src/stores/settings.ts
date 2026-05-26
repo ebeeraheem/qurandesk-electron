@@ -37,7 +37,7 @@ export function initSettings(): Promise<void> {
 export async function updateSettings(patch: Partial<Settings>): Promise<void> {
   useSettingsStore.setState((s) => ({ settings: { ...s.settings, ...patch } }))
   try {
-    const next = await window.api.updateSettings(patch)
+    const next = await globalThis.api.updateSettings(patch)
     useSettingsStore.setState({ settings: next })
   } catch {
     // Network error against IPC is unlikely; fall back to a fresh fetch.
