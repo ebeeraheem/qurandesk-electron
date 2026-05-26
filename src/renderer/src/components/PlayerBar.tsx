@@ -173,8 +173,10 @@ export default function PlayerBar(): React.JSX.Element {
           <span className="tabular-nums">{formatTime(duration)}</span>
         </div>
 
-        {(pendingTrack || (errorMessage && status === 'ended')) && (
-          <div className="text-[10px] text-muted">
+        {(pendingTrack || (errorMessage && (status === 'ended' || status === 'error'))) && (
+          <div
+            className={['text-[10px]', status === 'error' ? 'text-danger' : 'text-muted'].join(' ')}
+          >
             {pendingTrack ? `Downloading next surah…` : errorMessage}
           </div>
         )}

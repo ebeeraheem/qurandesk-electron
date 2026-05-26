@@ -3,6 +3,7 @@ import { usePlayerStore } from './stores/player'
 import { useSettingsStore, updateSettings } from './stores/settings'
 import { useDownloadsStore } from './stores/downloads'
 import type { RepeatMode } from '@shared/api'
+import { getSurah } from '@shared/surahs'
 
 /**
  * Imperative wrapper around the single `<audio>` element owned by the
@@ -136,17 +137,11 @@ export async function playTrack(track: CurrentTrack): Promise<void> {
   try {
     url = await globalThis.api.getAudioUrl(track.reciterId, track.surahNumber)
   } catch (e) {
-    usePlayerStore.setState({
-      status: 'error',
-      errorMessage: e instanceof Error ? e.message : String(e)
-    })
+    handleUnavailable(track, e instanceof Error ? e.message : String(e))
     return
   }
   if (!url) {
-    usePlayerStore.setState({
-      status: 'error',
-      errorMessage: 'File is not on disk yet.'
-    })
+    handleUnavailable(track, null)
     return
   }
 
@@ -162,6 +157,46 @@ export async function playTrack(track: CurrentTrack): Promise<void> {
       })
     }
   }
+}
+
+/**
+ * Shared "target surah isn't on disk" handler. Called by `playTrack` (which
+ * runs for prev/next + row clicks) so manual navigation behaves the same way
+ * as auto-advance hitting a gap.
+ *
+ *  - Always pauses + clears the audio element so the previously-loaded track
+ *    doesn't keep playing under a different surah label in the UI.
+ *  - In `'download-then-play'` mode: enqueue the surah and stash it as
+ *    `pendingTrack`. The `download:completed` bridge picks it up and plays.
+ *  - In `'stop'` mode: surface a named hint via `errorMessage` so the user
+ *    knows exactly what's missing.
+ */
+function handleUnavailable(track: CurrentTrack, networkError: string | null): void {
+  if (audioEl) {
+    audioEl.pause()
+    // Drop the src so a follow-up `togglePlay` doesn't resume the prior file;
+    // togglePlay's defensive branch will re-enter `playTrack(current)` instead,
+    // landing back here with the same outcome.
+    audioEl.removeAttribute('src')
+    audioEl.load()
+  }
+
+  const mode = useSettingsStore.getState().settings.autoAdvanceMode
+  if (mode === 'download-then-play') {
+    usePlayerStore.setState({
+      status: 'paused',
+      pendingTrack: track,
+      errorMessage: null
+    })
+    void globalThis.api.downloadSurah(track.reciterId, track.surahNumber).catch(() => undefined)
+    return
+  }
+
+  const name = getSurah(track.surahNumber)?.name_en ?? `Surah ${track.surahNumber}`
+  usePlayerStore.setState({
+    status: 'error',
+    errorMessage: networkError ?? `${name} isn't downloaded yet.`
+  })
 }
 
 export function togglePlay(): void {

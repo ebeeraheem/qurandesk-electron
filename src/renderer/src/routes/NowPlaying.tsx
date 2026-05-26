@@ -203,8 +203,12 @@ export default function NowPlaying(): React.JSX.Element {
           </button>
         </div>
 
-        {(pendingTrack || (errorMessage && status === 'ended')) && (
-          <div className="mt-4 text-xs text-muted">
+        {(pendingTrack || (errorMessage && (status === 'ended' || status === 'error'))) && (
+          <div
+            className={['mt-4 text-xs', status === 'error' ? 'text-danger' : 'text-muted'].join(
+              ' '
+            )}
+          >
             {pendingTrack ? 'Downloading next surah…' : errorMessage}
           </div>
         )}
