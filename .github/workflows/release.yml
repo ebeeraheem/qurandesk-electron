@@ -1,0 +1,72 @@
+name: Release
+
+# Tag-driven release: push a `v*` tag (e.g. `git tag v0.2.0 && git push --tags`)
+# to build + publish for every OS in the matrix. Each runner uploads its
+# artifacts to the GitHub Release that matches the tag (created as a draft if
+# it doesn't exist yet — promote it manually once you've verified the build).
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  build:
+    name: Build & publish (${{ matrix.os }})
+    strategy:
+      # Keep building other platforms even if one fails — easier to debug a
+      # single broken target than to lose all artifacts.
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-latest
+          - os: windows-latest
+          # Linux deferred — uncomment when ready to ship .AppImage / .deb.
+          # - os: ubuntu-latest
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Compile (typecheck + vite build)
+        run: npm run build
+
+      # macOS: sign + notarize when secrets are present. Override `notarize`
+      # via the CLI so the yaml default (false, for local builds) doesn't
+      # leak into release builds.
+      - name: Package & publish (macOS)
+        if: matrix.os == 'macos-latest'
+        run: npx electron-builder --mac --arch universal --publish always -c.mac.notarize=true
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Developer ID Application cert exported as base64-encoded .p12
+          CSC_LINK: ${{ secrets.MAC_CERT_BASE64 }}
+          CSC_KEY_PASSWORD: ${{ secrets.MAC_CERT_PASSWORD }}
+          # notarytool credentials
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+
+      # Windows: v1 ships unsigned. When you add a cert later, set
+      # WIN_CSC_LINK / WIN_CSC_KEY_PASSWORD secrets and electron-builder
+      # picks them up automatically.
+      - name: Package & publish (Windows)
+        if: matrix.os == 'windows-latest'
+        run: npx electron-builder --win --publish always
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          WIN_CSC_LINK: ${{ secrets.WIN_CSC_LINK }}
+          WIN_CSC_KEY_PASSWORD: ${{ secrets.WIN_CSC_KEY_PASSWORD }}
+
+      - name: Package & publish (Linux)
+        if: matrix.os == 'ubuntu-latest'
+        run: npx electron-builder --linux --publish always
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

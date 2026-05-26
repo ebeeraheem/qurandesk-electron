@@ -2,42 +2,86 @@ appId: app.qurandesk
 productName: QuranDesk
 directories:
   buildResources: build
+
 files:
   - '!**/.vscode/*'
   - '!src/*'
+  - '!scripts/*'
   - '!electron.vite.config.{js,ts,mjs,cjs}'
   - '!{.eslintcache,eslint.config.mjs,.prettierignore,.prettierrc.yaml,dev-app-update.yml,CHANGELOG.md,README.md,TODOS.md}'
   - '!{.env,.env.*,.npmrc,pnpm-lock.yaml}'
   - '!{tsconfig.json,tsconfig.node.json,tsconfig.web.json}'
+
+# `better-sqlite3` ships a `.node` binary that can't be loaded from inside an
+# asar archive — unpack it (and the resources folder generally).
 asarUnpack:
   - resources/**
+  - '**/node_modules/better-sqlite3/**'
+
+# Skip electron-builder's own rebuild pass — `electron-builder install-app-deps`
+# runs in `postinstall` and produces the right ABI binaries; running rebuild
+# again during packaging is wasted time.
+npmRebuild: false
+
+# ---------------------------------------------------------------------------
+# macOS — universal (arm64 + x64), hardened runtime, ready for notarization
+# ---------------------------------------------------------------------------
+mac:
+  category: public.app-category.music
+  target:
+    - dmg
+    - zip # zip is what electron-updater consumes for mac auto-updates
+  entitlementsInherit: build/entitlements.mac.plist
+  hardenedRuntime: true
+  gatekeeperAssess: false
+  # Local default — `npm run build:mac` works without an Apple Developer
+  # account. CI overrides via `-c.mac.notarize=true` and passes APPLE_*
+  # env vars from secrets when producing a release.
+  notarize: false
+  extendInfo:
+    - NSDocumentsFolderUsageDescription: QuranDesk needs access to manage downloaded recitations.
+
+dmg:
+  artifactName: ${name}-${version}.${ext}
+
+# ---------------------------------------------------------------------------
+# Windows — NSIS installer, unsigned for v1
+# ---------------------------------------------------------------------------
 win:
   executableName: QuranDesk
-  # Code-signing env vars (CSC_LINK, CSC_KEY_PASSWORD) wired but optional —
-  # v1 ships unsigned; SmartScreen warning clears with reputation or a cert.
+  target:
+    - target: nsis
+      arch:
+        - x64
+  # When WIN_CSC_LINK + WIN_CSC_KEY_PASSWORD env vars are present,
+  # electron-builder signs automatically (sha256 by default in v26+).
+  # v1 ships unsigned — SmartScreen warning clears with download
+  # reputation or an OV/EV cert later.
+
 nsis:
   artifactName: ${name}-${version}-setup.${ext}
   shortcutName: ${productName}
   uninstallDisplayName: ${productName}
   createDesktopShortcut: always
-mac:
-  category: public.app-category.music
-  entitlementsInherit: build/entitlements.mac.plist
-  # Universal binary built when packaging: --arch universal
-  notarize: false
-  extendInfo:
-    - NSDocumentsFolderUsageDescription: QuranDesk needs access to manage downloaded recitations.
-dmg:
-  artifactName: ${name}-${version}.${ext}
+  oneClick: false
+  allowToChangeInstallationDirectory: true
+
+# ---------------------------------------------------------------------------
+# Linux — bonus target. AppImage runs anywhere, deb covers the Debian family.
+# ---------------------------------------------------------------------------
 linux:
   target:
     - AppImage
     - deb
   maintainer: qurandesk.app
   category: AudioVideo
+
 appImage:
   artifactName: ${name}-${version}.${ext}
-npmRebuild: false
+
+# ---------------------------------------------------------------------------
+# Auto-update / release publishing
+# ---------------------------------------------------------------------------
 publish:
   provider: github
   owner: ebeeraheem

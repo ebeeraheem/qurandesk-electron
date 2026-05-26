@@ -137,10 +137,16 @@ Legend: ✅ done · 🚧 in progress · ⬜ not started
 
 ## Phase 11 — Packaging
 
-- ⬜ Icons script generating `icon.icns`, `icon.ico`, `icon.png` from `logo.svg`
-- ⬜ macOS universal binary signed + notarized (env-gated)
-- ⬜ Windows NSIS (unsigned for v1; cert env vars wired)
-- ⬜ GitHub Actions matrix release workflow
+- ✅ `scripts/build-icons.mjs` — pure-JS (no native deps) icon generation. SVG → 1024 px PNG via `@resvg/resvg-js`, then `.icns` + `.ico` via `png2icons`. `npm run icons` re-runnable; writes to `build/icon.{png,icns,ico}` + `resources/icon.png`
+- ✅ `electron-builder.yml` updated:
+  - macOS: `dmg + zip` targets, hardened runtime, `gatekeeperAssess: false`, `notarize: false` for local builds (CI overrides via `-c.mac.notarize=true`)
+  - Windows: explicit `nsis` x64 target; cert env vars (`WIN_CSC_LINK` / `WIN_CSC_KEY_PASSWORD`) consumed automatically when present (v1 ships unsigned)
+  - `asarUnpack: '**/node_modules/better-sqlite3/**'` so the `.node` binary loads at runtime
+  - `npmRebuild: false` so the postinstall rebuild isn't repeated during packaging
+- ✅ `.github/workflows/ci.yml` — typecheck + lint + build on push/PR (ubuntu, fast)
+- ✅ `.github/workflows/release.yml` — tag-driven matrix (macos-latest + windows-latest, linux deferred). Mac step passes `APPLE_*` + `CSC_*` from secrets; Windows step passes `WIN_CSC_*` if available; both publish via `--publish always`
+- ✅ Smoke-tested `npm run build:unpack` locally — produces `dist\win-unpacked\QuranDesk.exe` (201 MB w/ Electron runtime), `app.asar` (7.7 MB), `better_sqlite3.node` correctly unpacked outside the asar
+- ✅ README rewritten with build, release, and secret-setup instructions
 
 ## Phase 12 — Polish
 
