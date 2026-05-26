@@ -4,8 +4,8 @@
   "version": "0.2.0",
   "description": "A quiet listening room for complete Qur'an recitations — offline desktop player.",
   "main": "./out/main/index.js",
-  "author": "QuranDesk",
-  "homepage": "https://qurandesk.app",
+  "author": "Ebee Solutions",
+  "homepage": "https://qurandesk.ebeesolutions.com",
   "scripts": {
     "format": "prettier --write .",
     "lint": "eslint --cache .",
