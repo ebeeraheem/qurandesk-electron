@@ -345,9 +345,7 @@ async function runJob(row: QueueRow): Promise<void> {
     }
     const msg = e instanceof Error ? e.message : String(e)
     // If queue row still exists, mark failed.
-    const stillThere = getDb()
-      .prepare('SELECT 1 FROM download_queue WHERE id = ?')
-      .get(row.id)
+    const stillThere = getDb().prepare('SELECT 1 FROM download_queue WHERE id = ?').get(row.id)
     if (stillThere) {
       getDb()
         .prepare(`UPDATE download_queue SET status = 'failed', error = ? WHERE id = ?`)
@@ -510,9 +508,9 @@ function makeAbort(): Error {
 
 function isAbort(e: unknown): boolean {
   return (
-    e instanceof DOMException &&
-    (e.name === 'AbortError' || e.code === DOMException.ABORT_ERR)
-  ) || (e instanceof Error && e.name === 'AbortError')
+    (e instanceof DOMException && (e.name === 'AbortError' || e.code === DOMException.ABORT_ERR)) ||
+    (e instanceof Error && e.name === 'AbortError')
+  )
 }
 
 // ---------------------------------------------------------------------------

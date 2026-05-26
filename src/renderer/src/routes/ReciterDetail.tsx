@@ -87,10 +87,9 @@ export default function ReciterDetail(): React.JSX.Element {
           <div className="min-w-0">
             <h1 className="truncate text-3xl font-bold">{reciter.name}</h1>
             <p className="mt-1 text-sm text-muted">
-              {reciter.style ?? '—'} · {formatBytes(reciter.totalSizeBytes)} · {downloadedCount} / 114
-              {inFlight > 0 && (
-                <span className="ml-1 text-primary">({inFlight} in progress)</span>
-              )}
+              {reciter.style ?? '—'} · {formatBytes(reciter.totalSizeBytes)} · {downloadedCount} /
+              114
+              {inFlight > 0 && <span className="ml-1 text-primary">({inFlight} in progress)</span>}
             </p>
           </div>
           <AggregateButton
@@ -149,7 +148,13 @@ function AggregateButton({
   if (downloadedCount >= 114) {
     return (
       <div className="flex items-center gap-2 rounded-full bg-success/15 px-4 py-2 text-xs font-semibold text-success">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="size-4">
+        <svg
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2.5"
+          className="size-4"
+        >
           <path d="m5 12 5 5 9-11" strokeLinecap="round" strokeLinejoin="round" />
         </svg>
         Downloaded

@@ -14,9 +14,10 @@ const VALID_MODE = new Set(['stop', 'download-then-play'])
 const VALID_REPEAT = new Set(['off', 'one'])
 
 export function getSettings(): Settings {
-  const rows = getDb()
-    .prepare('SELECT key, value FROM settings')
-    .all() as Array<{ key: string; value: string }>
+  const rows = getDb().prepare('SELECT key, value FROM settings').all() as Array<{
+    key: string
+    value: string
+  }>
   const stored: Record<string, unknown> = {}
   for (const r of rows) {
     try {

@@ -1,10 +1,5 @@
 import { useEffect, useRef } from 'react'
-import {
-  handleEnded,
-  maybePersist,
-  persistNow,
-  setAudioElement
-} from '../audioEngine'
+import { handleEnded, maybePersist, persistNow, setAudioElement } from '../audioEngine'
 import { usePlayerStore } from '../stores/player'
 
 /**

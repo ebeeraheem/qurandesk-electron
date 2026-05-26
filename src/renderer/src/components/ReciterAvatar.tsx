@@ -29,10 +29,9 @@ export default function ReciterAvatar({
 
   return (
     <div
-      className={[
-        'relative aspect-square overflow-hidden rounded-2xl bg-bg-elev',
-        className
-      ].join(' ')}
+      className={['relative aspect-square overflow-hidden rounded-2xl bg-bg-elev', className].join(
+        ' '
+      )}
     >
       {src ? (
         <img

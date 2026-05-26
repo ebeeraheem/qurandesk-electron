@@ -11,10 +11,7 @@ import Welcome from './routes/Welcome'
 import NowPlaying from './routes/NowPlaying'
 import UpdateBanner from './components/UpdateBanner'
 
-type Gate =
-  | { kind: 'checking' }
-  | { kind: 'welcome' }
-  | { kind: 'app' }
+type Gate = { kind: 'checking' } | { kind: 'welcome' } | { kind: 'app' }
 
 export default function App(): React.JSX.Element {
   const [gate, setGate] = useState<Gate>({ kind: 'checking' })

@@ -53,10 +53,7 @@ export function photoFilePath(filename: string): string | null {
 }
 
 /** Compute the cache filename for a reciter based on their photo URL extension. */
-export function cacheFilenameForReciter(
-  reciterId: string,
-  photoUrl: string
-): string | null {
+export function cacheFilenameForReciter(reciterId: string, photoUrl: string): string | null {
   if (!SAFE_RECITER_ID.test(reciterId)) return null
   let pathname: string
   try {
@@ -90,10 +87,7 @@ function isAllowedSource(url: string): boolean {
 }
 
 /** Returns true if the photo is on disk (or just got cached). */
-export async function ensurePhotoCached(
-  filename: string,
-  sourceUrl: string
-): Promise<boolean> {
+export async function ensurePhotoCached(filename: string, sourceUrl: string): Promise<boolean> {
   const dest = photoFilePath(filename)
   if (!dest) return false
 

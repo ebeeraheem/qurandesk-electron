@@ -1,10 +1,5 @@
 import { useEffect, useState } from 'react'
-import type {
-  AppInfo,
-  AutoAdvanceMode,
-  PlaybackSpeed,
-  ThemePreference
-} from '@shared/api'
+import type { AppInfo, AutoAdvanceMode, PlaybackSpeed, ThemePreference } from '@shared/api'
 import { useSettingsStore, updateSettings } from '../stores/settings'
 import { useUpdaterStore } from '../stores/updater'
 import { formatAbsoluteDate, formatRelativeTime } from '../utils/format'
@@ -40,7 +35,10 @@ export default function Settings(): React.JSX.Element {
   const [refreshing, setRefreshing] = useState(false)
 
   useEffect(() => {
-    void window.api.getAppInfo().then(setAppInfo).catch(() => undefined)
+    void window.api
+      .getAppInfo()
+      .then(setAppInfo)
+      .catch(() => undefined)
     void window.api.getManifestStatus().then(setManifestStatus)
     const off = window.api.on('manifest:updated', () => {
       void window.api.getManifestStatus().then(setManifestStatus)
@@ -111,7 +109,10 @@ export default function Settings(): React.JSX.Element {
           sub="Audio files for offline playback."
           control={
             <div className="flex items-center gap-2">
-              <code className="max-w-[260px] truncate rounded-md bg-bg-elev px-3 py-1.5 font-mono text-xs text-muted" title={appInfo?.audioDir}>
+              <code
+                className="max-w-[260px] truncate rounded-md bg-bg-elev px-3 py-1.5 font-mono text-xs text-muted"
+                title={appInfo?.audioDir}
+              >
                 {appInfo?.audioDir ?? '—'}
               </code>
               <button
@@ -145,9 +146,7 @@ export default function Settings(): React.JSX.Element {
       <Section title="About">
         <Row
           label="Version"
-          control={
-            <span className="font-mono text-xs text-muted">{appInfo?.version ?? '—'}</span>
-          }
+          control={<span className="font-mono text-xs text-muted">{appInfo?.version ?? '—'}</span>}
         />
         <UpdateRow />
         <Row
@@ -157,7 +156,9 @@ export default function Settings(): React.JSX.Element {
               {manifestStatus.cachedAt ? (
                 <>
                   {formatAbsoluteDate(new Date(manifestStatus.cachedAt).toISOString())}
-                  <span className="ml-2 text-faint">({formatRelativeTime(manifestStatus.cachedAt)})</span>
+                  <span className="ml-2 text-faint">
+                    ({formatRelativeTime(manifestStatus.cachedAt)})
+                  </span>
                 </>
               ) : (
                 '—'
@@ -297,4 +298,3 @@ function SegmentedControl<T extends string | number>({
     </div>
   )
 }
-

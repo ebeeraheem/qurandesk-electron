@@ -114,7 +114,11 @@ export default function Downloads(): React.JSX.Element {
         <Section title="Failed">
           <ul className="divide-y divide-border rounded-xl border border-border bg-bg-elev">
             {failedEntries.map((q) => (
-              <FailedRow key={`${q.reciterId}:${q.surahNumber}`} entry={q} reciter={reciterById.get(q.reciterId)} />
+              <FailedRow
+                key={`${q.reciterId}:${q.surahNumber}`}
+                entry={q}
+                reciter={reciterById.get(q.reciterId)}
+              />
             ))}
           </ul>
         </Section>
@@ -200,12 +204,7 @@ function ActiveReciterCard({
       : 0
   // Combine completed surahs + the active surah's partial contribution.
   const overallPct =
-    totalScope === 0
-      ? 0
-      : Math.min(
-          100,
-          ((downloadedCount + activePct / 100) / totalScope) * 100
-        )
+    totalScope === 0 ? 0 : Math.min(100, ((downloadedCount + activePct / 100) / totalScope) * 100)
 
   const name = reciter?.name ?? reciterId
   const activeSurah = active ? getSurah(active.surahNumber) : null
@@ -221,7 +220,10 @@ function ActiveReciterCard({
 
         <div className="min-w-0 flex-1">
           <div className="flex items-baseline justify-between gap-3">
-            <Link to={`/reciter/${reciterId}`} className="truncate font-semibold hover:text-primary">
+            <Link
+              to={`/reciter/${reciterId}`}
+              className="truncate font-semibold hover:text-primary"
+            >
               {name}
             </Link>
             <div className="shrink-0 text-xs text-muted">
@@ -240,12 +242,20 @@ function ActiveReciterCard({
           <div className="mt-2 flex items-center gap-2 text-xs text-muted">
             {active ? (
               <>
-                <svg viewBox="0 0 24 24" className="size-3 animate-spin text-primary" fill="none" stroke="currentColor" strokeWidth="2">
+                <svg
+                  viewBox="0 0 24 24"
+                  className="size-3 animate-spin text-primary"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                >
                   <path d="M21 12a9 9 0 1 1-6.2-8.55" strokeLinecap="round" />
                 </svg>
                 <span>
                   Downloading{' '}
-                  <span className="text-fg">{activeSurah?.name_en ?? `Surah ${active.surahNumber}`}</span>
+                  <span className="text-fg">
+                    {activeSurah?.name_en ?? `Surah ${active.surahNumber}`}
+                  </span>
                 </span>
               </>
             ) : queued.length > 0 ? (
@@ -253,9 +263,7 @@ function ActiveReciterCard({
             ) : (
               <span>—</span>
             )}
-            {failed.length > 0 && (
-              <span className="text-danger">· {failed.length} failed</span>
-            )}
+            {failed.length > 0 && <span className="text-danger">· {failed.length} failed</span>}
           </div>
         </div>
 
@@ -270,7 +278,13 @@ function ActiveReciterCard({
           title="Cancel all in this reciter"
           className="grid size-8 shrink-0 place-items-center rounded-full text-muted hover:bg-danger/10 hover:text-danger"
         >
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="size-4">
+          <svg
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            className="size-4"
+          >
             <path d="M6 6l12 12M18 6l-12 12" strokeLinecap="round" />
           </svg>
         </button>
@@ -307,9 +321,9 @@ function FailedRow({
       <div className="flex shrink-0 gap-2">
         <button
           onClick={() =>
-            void window.api.cancelDownload(entry.reciterId, entry.surahNumber).then(() =>
-              window.api.downloadSurah(entry.reciterId, entry.surahNumber)
-            )
+            void window.api
+              .cancelDownload(entry.reciterId, entry.surahNumber)
+              .then(() => window.api.downloadSurah(entry.reciterId, entry.surahNumber))
           }
           className="rounded-full bg-warning/15 px-3 py-1 text-xs font-semibold text-warning hover:bg-warning/25"
         >
@@ -362,8 +376,17 @@ function ReciterLine({
         aria-label="Delete downloads"
         className="grid size-8 shrink-0 place-items-center rounded-full text-muted hover:bg-danger/10 hover:text-danger"
       >
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="size-4">
-          <path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m3 0v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6" strokeLinecap="round" />
+        <svg
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.8"
+          className="size-4"
+        >
+          <path
+            d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m3 0v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"
+            strokeLinecap="round"
+          />
         </svg>
       </button>
     </li>

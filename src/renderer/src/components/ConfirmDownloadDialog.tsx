@@ -53,7 +53,8 @@ export default function ConfirmDownloadDialog({
 
   let state: 'insufficient' | 'tight' | 'ok' | 'unknown' = 'ok'
   if (!known) state = 'unknown'
-  else if (haveEstimate && estimatedBytes! > freeBytes! - SAFETY_MARGIN_BYTES) state = 'insufficient'
+  else if (haveEstimate && estimatedBytes! > freeBytes! - SAFETY_MARGIN_BYTES)
+    state = 'insufficient'
   else if (haveEstimate && estimatedBytes! > freeBytes! - 5 * SAFETY_MARGIN_BYTES) state = 'tight'
 
   return (
@@ -75,7 +76,10 @@ export default function ConfirmDownloadDialog({
         </p>
 
         <div className="mt-5 space-y-2 rounded-lg border border-border bg-bg-elev px-4 py-3 text-sm">
-          <Row label="Download size" value={haveEstimate ? `~${formatBytes(estimatedBytes!)}` : '—'} />
+          <Row
+            label="Download size"
+            value={haveEstimate ? `~${formatBytes(estimatedBytes!)}` : '—'}
+          />
           <Row label="Free disk" value={known ? formatBytes(freeBytes!) : '—'} />
           {totalBytes && totalBytes > 0 && (
             <Row label="Total disk" value={formatBytes(totalBytes)} muted />
@@ -138,7 +142,9 @@ function Row({
   muted?: boolean
 }): React.JSX.Element {
   return (
-    <div className={['flex justify-between gap-4', muted && 'text-muted'].filter(Boolean).join(' ')}>
+    <div
+      className={['flex justify-between gap-4', muted && 'text-muted'].filter(Boolean).join(' ')}
+    >
       <span className="text-muted">{label}</span>
       <span className="font-mono tabular-nums">{value}</span>
     </div>

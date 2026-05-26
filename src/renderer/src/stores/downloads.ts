@@ -54,9 +54,7 @@ function applyProgress(p: SurahDownload): void {
     }
     // Update queue mirror too.
     let queue = s.queue
-    const i = queue.findIndex(
-      (q) => q.reciterId === p.reciterId && q.surahNumber === p.surahNumber
-    )
+    const i = queue.findIndex((q) => q.reciterId === p.reciterId && q.surahNumber === p.surahNumber)
     if (p.status === 'queued' || p.status === 'active' || p.status === 'failed') {
       const entry: QueueEntry = {
         reciterId: p.reciterId,
@@ -111,9 +109,7 @@ export function initDownloadsBridge(): void {
 /** Returns the 114-entry array for a reciter, hydrating from IPC on first use. */
 export function useReciterDownloads(reciterId: string | undefined): SurahDownload[] {
   const map = useDownloadsStore((s) => (reciterId ? s.byReciter[reciterId] : undefined))
-  const hydrated = useDownloadsStore((s) =>
-    reciterId ? s.hydrated.has(reciterId) : false
-  )
+  const hydrated = useDownloadsStore((s) => (reciterId ? s.hydrated.has(reciterId) : false))
 
   useEffect(() => {
     if (!reciterId || hydrated) return

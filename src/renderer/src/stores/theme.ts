@@ -53,13 +53,11 @@ export function initTheme(): void {
 
   // 3. Follow OS changes while preference is 'system'.
   if (typeof window !== 'undefined') {
-    window
-      .matchMedia('(prefers-color-scheme: dark)')
-      .addEventListener('change', () => {
-        if (useSettingsStore.getState().settings.theme === 'system') {
-          applyClass(resolveActive('system'))
-        }
-      })
+    window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => {
+      if (useSettingsStore.getState().settings.theme === 'system') {
+        applyClass(resolveActive('system'))
+      }
+    })
   }
 }
 

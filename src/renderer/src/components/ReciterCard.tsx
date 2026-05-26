@@ -9,8 +9,7 @@ type Props = {
 
 export default function ReciterCard({ reciter, onClick }: Props): React.JSX.Element {
   const stateLabel = subtitle(reciter)
-  const showPartialBadge =
-    reciter.downloadState === 'partial' && reciter.downloadedSurahs > 0
+  const showPartialBadge = reciter.downloadState === 'partial' && reciter.downloadedSurahs > 0
   const showCompleteCheck = reciter.downloadState === 'complete'
 
   return (
@@ -32,7 +31,13 @@ export default function ReciterCard({ reciter, onClick }: Props): React.JSX.Elem
         {/* Top-right green check when complete */}
         {showCompleteCheck && (
           <div className="absolute right-2 top-2 grid size-7 place-items-center rounded-full bg-success text-white shadow-sm">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" className="size-4">
+            <svg
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="3"
+              className="size-4"
+            >
               <path d="m5 12 5 5 9-11" strokeLinecap="round" strokeLinejoin="round" />
             </svg>
           </div>

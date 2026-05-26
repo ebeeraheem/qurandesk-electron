@@ -30,7 +30,7 @@ export default function SurahRow({ download, reciterId, reciterName }: Props): R
   // Active downloads fill a subtle background up to their progress percent.
   const activePct =
     download.status === 'active' && download.totalBytes
-      ? Math.min(100, (download.progressBytes ?? 0) / download.totalBytes * 100)
+      ? Math.min(100, ((download.progressBytes ?? 0) / download.totalBytes) * 100)
       : 0
 
   return (
@@ -109,11 +109,7 @@ function RowStatus({ download }: { download: SurahDownload }): React.JSX.Element
         download.totalBytes && download.progressBytes
           ? Math.min(100, Math.round((download.progressBytes / download.totalBytes) * 100))
           : 0
-      return (
-        <div className="mt-0.5 text-[11px] text-primary">
-          Downloading… {pct}%
-        </div>
-      )
+      return <div className="mt-0.5 text-[11px] text-primary">Downloading… {pct}%</div>
     }
     case 'failed':
       return <div className="mt-0.5 text-[11px] text-danger">Failed — click ↻ to retry</div>
@@ -164,7 +160,13 @@ function ActionButton({
           aria-label="Cancel download"
           title="Cancel"
         >
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="size-4">
+          <svg
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            className="size-4"
+          >
             <path d="M6 6l12 12M18 6l-12 12" strokeLinecap="round" />
           </svg>
         </button>
@@ -175,15 +177,21 @@ function ActionButton({
         <button
           onClick={(e) => {
             e.stopPropagation()
-            void window.api.cancelDownload(download.reciterId, download.surahNumber).then(() =>
-              window.api.downloadSurah(download.reciterId, download.surahNumber)
-            )
+            void window.api
+              .cancelDownload(download.reciterId, download.surahNumber)
+              .then(() => window.api.downloadSurah(download.reciterId, download.surahNumber))
           }}
           className="grid size-8 place-items-center rounded-full bg-warning/15 text-warning hover:bg-warning/25"
           aria-label="Retry download"
           title="Retry"
         >
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="size-4">
+          <svg
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            className="size-4"
+          >
             <path d="M3 12a9 9 0 0 1 15-6.7L21 8" strokeLinecap="round" />
             <path d="M21 3v5h-5" strokeLinecap="round" strokeLinejoin="round" />
             <path d="M21 12a9 9 0 0 1-15 6.7L3 16" strokeLinecap="round" />
@@ -203,8 +211,18 @@ function ActionButton({
           aria-label="Download"
           title="Download"
         >
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="size-4">
-            <path d="M12 4v12m0 0-4-4m4 4 4-4M5 20h14" strokeLinecap="round" strokeLinejoin="round" />
+          <svg
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.8"
+            className="size-4"
+          >
+            <path
+              d="M12 4v12m0 0-4-4m4 4 4-4M5 20h14"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
           </svg>
         </button>
       )

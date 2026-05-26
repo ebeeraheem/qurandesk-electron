@@ -13,7 +13,13 @@ const items: NavItem[] = [
     to: '/reciters',
     label: 'Reciters',
     icon: (
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="size-5">
+      <svg
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        className="size-5"
+      >
         <circle cx="12" cy="8" r="4" />
         <path d="M4 21c0-4 4-6 8-6s8 2 8 6" strokeLinecap="round" />
       </svg>
@@ -23,7 +29,13 @@ const items: NavItem[] = [
     to: '/downloads',
     label: 'Downloads',
     icon: (
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="size-5">
+      <svg
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        className="size-5"
+      >
         <path
           d="M4 14a8 8 0 0 1 15.5-2.5A4.5 4.5 0 0 1 18 20H7a4 4 0 0 1-3-6Z"
           strokeLinejoin="round"
@@ -35,7 +47,13 @@ const items: NavItem[] = [
     to: '/settings',
     label: 'Settings',
     icon: (
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="size-5">
+      <svg
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        className="size-5"
+      >
         <circle cx="12" cy="12" r="3" />
         <path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.9-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1-1.5 1.7 1.7 0 0 0-1.9.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.9 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1 1.7 1.7 0 0 0-.3-1.9l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.9.3h.1a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.9-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.9v.1a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1Z" />
       </svg>
@@ -66,9 +84,7 @@ export default function Sidebar(): React.JSX.Element {
               className={({ isActive }) =>
                 [
                   'group flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors',
-                  isActive
-                    ? 'bg-bg-tint text-primary'
-                    : 'text-muted hover:bg-bg-elev hover:text-fg'
+                  isActive ? 'bg-bg-tint text-primary' : 'text-muted hover:bg-bg-elev hover:text-fg'
                 ].join(' ')
               }
             >
@@ -89,7 +105,6 @@ export default function Sidebar(): React.JSX.Element {
           )
         })}
       </nav>
-
     </aside>
   )
 }

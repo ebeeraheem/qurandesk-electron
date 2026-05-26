@@ -76,10 +76,7 @@ export function audioFilePath(reciterId: string, surah: number): string | null {
 }
 
 /** Returns the file path only if it actually exists on disk; null otherwise. */
-export async function audioFileIfExists(
-  reciterId: string,
-  surah: number
-): Promise<string | null> {
+export async function audioFileIfExists(reciterId: string, surah: number): Promise<string | null> {
   const p = audioFilePath(reciterId, surah)
   if (!p) return null
   try {

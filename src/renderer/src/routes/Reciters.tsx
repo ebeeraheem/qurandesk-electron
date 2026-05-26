@@ -15,10 +15,7 @@ export default function Reciters(): React.JSX.Element {
   const [loaded, setLoaded] = useState(false)
 
   const reload = async (): Promise<void> => {
-    const [list, s] = await Promise.all([
-      window.api.getReciters(),
-      window.api.getManifestStatus()
-    ])
+    const [list, s] = await Promise.all([window.api.getReciters(), window.api.getManifestStatus()])
     setReciters(list)
     setStatus(s)
     setLoaded(true)
@@ -91,7 +88,13 @@ function SearchInput({
 }): React.JSX.Element {
   return (
     <label className="flex w-72 items-center gap-2 rounded-full border border-border bg-bg-elev px-4 py-2 text-sm focus-within:border-primary">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="size-4 text-muted">
+      <svg
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2"
+        className="size-4 text-muted"
+      >
         <circle cx="11" cy="11" r="7" />
         <path d="m21 21-4.3-4.3" strokeLinecap="round" />
       </svg>
@@ -107,7 +110,13 @@ function SearchInput({
           className="text-muted hover:text-fg"
           aria-label="Clear search"
         >
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="size-4">
+          <svg
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            className="size-4"
+          >
             <path d="M6 6l12 12M18 6l-12 12" strokeLinecap="round" />
           </svg>
         </button>

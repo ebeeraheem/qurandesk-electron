@@ -112,9 +112,7 @@ export async function restoreLastPlayback(): Promise<void> {
 
   // Pre-load so `audioEl.src` is real before the user hits play and so
   // `loadedmetadata` fires (populating duration in the UI).
-  const url = await window.api
-    .getAudioUrl(last.reciterId, last.surahNumber)
-    .catch(() => null)
+  const url = await window.api.getAudioUrl(last.reciterId, last.surahNumber).catch(() => null)
   if (url) {
     applySrc(url, last.positionSeconds)
   }
@@ -262,8 +260,7 @@ export function handleEnded(): void {
   const nextNum = current.surahNumber + 1
   if (nextNum > 114) return // end of Qur'an; stop cleanly.
 
-  const nextStatus =
-    useDownloadsStore.getState().byReciter[current.reciterId]?.[nextNum]?.status
+  const nextStatus = useDownloadsStore.getState().byReciter[current.reciterId]?.[nextNum]?.status
   if (nextStatus === 'downloaded') {
     void playTrack({ ...current, surahNumber: nextNum })
     return

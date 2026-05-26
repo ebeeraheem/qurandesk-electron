@@ -19,9 +19,7 @@ type PlaybackRow = {
 
 export function getLastPlayback(): LastPlayback {
   const row = getDb()
-    .prepare(
-      'SELECT reciter_id, surah_number, position_seconds FROM playback_state WHERE id = 1'
-    )
+    .prepare('SELECT reciter_id, surah_number, position_seconds FROM playback_state WHERE id = 1')
     .get() as PlaybackRow | undefined
   if (!row || row.reciter_id === null || row.surah_number === null) return null
   return {

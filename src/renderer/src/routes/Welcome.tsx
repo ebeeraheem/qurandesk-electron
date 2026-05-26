@@ -55,8 +55,8 @@ export default function Welcome({ onContinue }: Props): React.JSX.Element {
           Welcome to QuranDesk
         </h1>
         <p className="mt-4 text-sm leading-relaxed text-muted">
-          A quiet listening room for complete Qur&apos;an recitations. Choose a reciter,
-          download the surahs you want, and listen offline.
+          A quiet listening room for complete Qur&apos;an recitations. Choose a reciter, download
+          the surahs you want, and listen offline.
         </p>
 
         <div className="app-no-drag mt-8 flex flex-col items-center gap-3">
@@ -74,7 +74,9 @@ export default function Welcome({ onContinue }: Props): React.JSX.Element {
                 className="rounded-full bg-warm px-7 py-3 text-sm font-bold text-fg shadow-sm transition-opacity hover:opacity-90"
               >
                 Continue to your library
-                <span aria-hidden className="ml-2">›</span>
+                <span aria-hidden className="ml-2">
+                  ›
+                </span>
               </button>
               <div className="text-xs text-muted">
                 {phase.reciterCount} reciter{phase.reciterCount === 1 ? '' : 's'} available
