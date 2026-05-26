@@ -209,7 +209,9 @@ export default function NowPlaying(): React.JSX.Element {
               ' '
             )}
           >
-            {pendingTrack ? 'Downloading next surah…' : errorMessage}
+            {pendingTrack
+              ? `Downloading ${getSurah(pendingTrack.surahNumber)?.name_en ?? `surah ${pendingTrack.surahNumber}`}…`
+              : errorMessage}
           </div>
         )}
       </div>

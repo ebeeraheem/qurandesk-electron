@@ -177,7 +177,9 @@ export default function PlayerBar(): React.JSX.Element {
           <div
             className={['text-[10px]', status === 'error' ? 'text-danger' : 'text-muted'].join(' ')}
           >
-            {pendingTrack ? `Downloading next surah…` : errorMessage}
+            {pendingTrack
+              ? `Downloading ${getSurah(pendingTrack.surahNumber)?.name_en ?? `surah ${pendingTrack.surahNumber}`}…`
+              : errorMessage}
           </div>
         )}
       </div>
