@@ -48,17 +48,14 @@ jobs:
       # module: `npm install` on the arm64 runner produces an arm64 .node
       # file, electron-builder packages it into both arch temp-dirs, then
       # `@electron/universal` refuses to merge two identical-but-not-lipo'd
-      # files. The right long-term fix is a second runner on `macos-13`
-      # building x64 separately — adds parallel-publish race on
-      # `latest-mac.yml` which needs careful handling. Deferred until there
-      # is real demand for Intel Mac support (Apple Silicon is ~70% of the
-      # installed base and rising).
+      # files. Intel (x64) Mac support deferred until there is real demand
+      # (Apple Silicon is ~70% of the installed base and rising).
       #
       # Override `notarize` via the CLI so the yaml default (false, for
       # local builds) doesn't leak into release builds.
       - name: Package & publish (macOS arm64)
         if: matrix.os == 'macos-latest'
-        run: npx electron-builder --mac --arch=arm64 --publish always -c.mac.notarize=true
+        run: npx electron-builder --mac --arm64 --publish always -c.mac.notarize=true
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           # Developer ID Application cert exported as base64-encoded .p12
