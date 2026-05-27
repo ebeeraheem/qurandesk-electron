@@ -7,6 +7,10 @@ import type { QueueEntry, SurahDownload } from '../shared/api'
 import { getDb } from './db'
 import { audioFilePath } from './protocol'
 import * as manifest from './manifest'
+import { appError, throwAppError } from './errors'
+
+const CATALOG_NOT_LOADED_MSG = "The reciter catalog hasn't loaded yet. Try again in a moment."
+const DOWNLOAD_FAILED_MSG = 'Download failed. Check your internet connection and try again.'
 
 /**
  * Streamed downloader with persistent queue.
@@ -151,9 +155,9 @@ export function enqueueSurah(reciterId: string, surah: number): void {
 
 export function enqueueReciter(reciterId: string): number {
   const m = manifest.getCachedManifest()
-  if (!m) throw new Error('Catalog not loaded')
+  if (!m) throwAppError('catalog/not-loaded', CATALOG_NOT_LOADED_MSG)
   if (!m.reciters.some((r) => r.id === reciterId)) {
-    throw new Error(`Unknown reciter id: ${reciterId}`)
+    throwAppError('catalog/unknown-reciter', "That reciter isn't available anymore.", reciterId)
   }
 
   // Bulk-insert anything not already downloaded or queued. Transaction keeps
@@ -440,17 +444,37 @@ async function downloadWithRetries(row: QueueRow, signal: AbortSignal): Promise<
 
 async function streamDownload(row: QueueRow, signal: AbortSignal): Promise<void> {
   const m = manifest.getCachedManifest()
-  if (!m) throw new Error('Catalog not loaded')
+  if (!m) throwAppError('catalog/not-loaded', CATALOG_NOT_LOADED_MSG)
   const url = `${m.audio_base_url}/${row.reciter_id}/${String(row.surah_number).padStart(3, '0')}.mp3`
   const final = audioFilePath(row.reciter_id, row.surah_number)
-  if (!final) throw new Error('Invalid file path')
+  if (!final) {
+    throwAppError(
+      'download/path-invalid',
+      "Couldn't save the download to disk.",
+      `${row.reciter_id}/${row.surah_number}`
+    )
+  }
   const partial = `${final}.partial`
 
   await fsp.mkdir(dirname(final), { recursive: true })
 
   const resp = await fetch(url, { signal })
-  if (!resp.ok) throw new Error(`HTTP ${resp.status} ${resp.statusText}`)
-  if (!resp.body) throw new Error('Empty response body')
+  if (!resp.ok) {
+    throw Object.assign(
+      new Error(DOWNLOAD_FAILED_MSG),
+      appError(
+        'download/http-failed',
+        DOWNLOAD_FAILED_MSG,
+        `HTTP ${resp.status} ${resp.statusText} fetching ${url}`
+      )
+    )
+  }
+  if (!resp.body) {
+    throw Object.assign(
+      new Error(DOWNLOAD_FAILED_MSG),
+      appError('download/empty-body', DOWNLOAD_FAILED_MSG, `empty body from ${url}`)
+    )
+  }
 
   const totalHeader = resp.headers.get('content-length')
   const totalBytes = totalHeader ? Number(totalHeader) : 0

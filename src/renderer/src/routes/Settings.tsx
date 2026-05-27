@@ -1,5 +1,11 @@
 import { useEffect, useState } from 'react'
-import type { AppInfo, AutoAdvanceMode, PlaybackSpeed, ThemePreference } from '@shared/api'
+import type {
+  AppError,
+  AppInfo,
+  AutoAdvanceMode,
+  PlaybackSpeed,
+  ThemePreference
+} from '@shared/api'
 import { useSettingsStore, updateSettings } from '../stores/settings'
 import { useUpdaterStore } from '../stores/updater'
 import { formatAbsoluteDate, formatRelativeTime } from '../utils/format'
@@ -30,7 +36,7 @@ export default function Settings(): React.JSX.Element {
   const [appInfo, setAppInfo] = useState<AppInfo | null>(null)
   const [manifestStatus, setManifestStatus] = useState<{
     cachedAt: number | null
-    lastError: string | null
+    lastError: AppError | null
   }>({ cachedAt: null, lastError: null })
   const [refreshing, setRefreshing] = useState(false)
 
@@ -128,7 +134,7 @@ export default function Settings(): React.JSX.Element {
           label="Refresh library"
           sub={
             manifestStatus.lastError
-              ? `Last refresh failed: ${manifestStatus.lastError}`
+              ? `Last refresh failed: ${manifestStatus.lastError.userMessage}`
               : `Check for newly added reciters.`
           }
           control={
@@ -164,6 +170,21 @@ export default function Settings(): React.JSX.Element {
                 '—'
               )}
             </span>
+          }
+        />
+      </Section>
+
+      <Section title="Troubleshooting">
+        <Row
+          label="Log file"
+          sub="Open the folder containing QuranDesk's diagnostic log. Attach it to bug reports."
+          control={
+            <button
+              onClick={() => globalThis.api.revealLogFile()}
+              className="rounded-md border border-border bg-bg-elev px-3 py-1.5 text-xs font-semibold text-muted hover:text-fg"
+            >
+              Reveal log file
+            </button>
           }
         />
       </Section>

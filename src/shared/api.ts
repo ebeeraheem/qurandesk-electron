@@ -56,6 +56,31 @@ export type UpdateStatus =
   | { status: 'ready'; version: string }
   | { status: 'error'; message: string }
 
+/**
+ * Stable identifiers for every error class the main process can surface. The
+ * renderer keys off `code` for behaviour (retry, hide, special copy); the
+ * `userMessage` is the only string a human should ever see.
+ */
+export type AppErrorCode =
+  | 'manifest/not-configured'
+  | 'manifest/fetch-failed'
+  | 'manifest/invalid'
+  | 'manifest/unsupported-version'
+  | 'catalog/not-loaded'
+  | 'catalog/unknown-reciter'
+  | 'input/invalid-reciter-id'
+  | 'input/invalid-surah'
+  | 'download/http-failed'
+  | 'download/empty-body'
+  | 'download/path-invalid'
+
+export type AppError = {
+  code: AppErrorCode
+  userMessage: string
+  /** Technical context for the log file; never rendered to the user. */
+  detail?: string
+}
+
 export type StorageUsage = {
   appUsedBytes: number
   totalBytes: number
@@ -91,8 +116,8 @@ export interface QuranDeskAPI {
 
   // Catalog (stubs for later phases)
   getReciters: () => Promise<ReciterSummary[]>
-  refreshManifest: () => Promise<{ ok: boolean; updatedAt?: string; error?: string }>
-  getManifestStatus: () => Promise<{ cachedAt: number | null; lastError: string | null }>
+  refreshManifest: () => Promise<{ ok: boolean; updatedAt?: string; error?: AppError }>
+  getManifestStatus: () => Promise<{ cachedAt: number | null; lastError: AppError | null }>
 
   // Surah-level
   getSurahDownloads: (reciterId: string) => Promise<SurahDownload[]>
@@ -125,6 +150,10 @@ export interface QuranDeskAPI {
   // Updates
   checkForUpdates: () => Promise<UpdateStatus>
   installUpdateOnQuit: () => Promise<void>
+
+  // Diagnostics
+  /** Open the OS file explorer at the log file location for bug reporting. */
+  revealLogFile: () => Promise<void>
 
   // Events — return unsubscribe function
   on: {
@@ -181,7 +210,9 @@ export const IPC = {
   setLastPlayback: 'playback:set',
 
   checkForUpdates: 'updater:check',
-  installUpdateOnQuit: 'updater:installOnQuit'
+  installUpdateOnQuit: 'updater:installOnQuit',
+
+  revealLogFile: 'system:revealLogFile'
 } as const
 
 export const DEFAULT_SETTINGS: Settings = {

@@ -1,10 +1,16 @@
 import { useEffect, useState } from 'react'
+import type { AppError } from '@shared/api'
 import logo from '../assets/logo.svg'
 
 type Phase =
   | { kind: 'loading' }
   | { kind: 'ready'; reciterCount: number; updatedAt: string }
-  | { kind: 'error'; message: string }
+  | { kind: 'error'; error: AppError }
+
+const UNKNOWN_ERROR: AppError = {
+  code: 'manifest/fetch-failed',
+  userMessage: 'Something went wrong. Please try again.'
+}
 
 type Props = {
   onContinue: () => void
@@ -22,7 +28,7 @@ export default function Welcome({ onContinue }: Readonly<Props>): React.JSX.Elem
     setPhase({ kind: 'loading' })
     const result = await globalThis.api.refreshManifest()
     if (!result.ok) {
-      setPhase({ kind: 'error', message: result.error ?? 'Unknown error' })
+      setPhase({ kind: 'error', error: result.error ?? UNKNOWN_ERROR })
       return
     }
     const reciters = await globalThis.api.getReciters()
@@ -92,7 +98,7 @@ export default function Welcome({ onContinue }: Readonly<Props>): React.JSX.Elem
           {phase.kind === 'error' && (
             <>
               <div className="max-w-sm rounded-md bg-danger/10 px-3 py-2 text-xs text-danger">
-                Couldn&apos;t reach the catalog: {phase.message}
+                {phase.error.userMessage}
               </div>
               <button
                 onClick={() => void tryFetch()}

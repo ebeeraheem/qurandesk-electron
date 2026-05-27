@@ -2,6 +2,8 @@ import { app } from 'electron'
 import { promises as fsp } from 'node:fs'
 import { join } from 'node:path'
 import { EventEmitter } from 'node:events'
+import type { AppError } from '../shared/api'
+import { appError, isAppError } from './errors'
 
 /**
  * Owns the remote reciter catalog: fetch, validate, persist, expose.
@@ -11,8 +13,9 @@ import { EventEmitter } from 'node:events'
  * subsequent launches.
  *
  * Validation is intentionally tolerant of optional fields and strict about
- * `schema_version` — an unknown major version is refused with a user-friendly
- * error string so the UI can surface "Update the app to load this catalog."
+ * `schema_version` — an unknown major version is refused as an AppError so the
+ * UI can surface "This catalog is newer than your version of QuranDesk." The
+ * raw schema mismatch lands in the log file via `appError`.
  */
 
 export type RemoteReciter = {
@@ -32,7 +35,7 @@ export type RemoteManifest = {
 
 export type ManifestStatus = {
   cachedAt: number | null
-  lastError: string | null
+  lastError: AppError | null
   fetching: boolean
 }
 
@@ -42,9 +45,12 @@ const SAFE_RECITER_ID = /^[a-z0-9-]+$/
 const events = new EventEmitter()
 let cached: RemoteManifest | null = null
 let cachedAt: number | null = null
-let lastError: string | null = null
+let lastError: AppError | null = null
 let fetching = false
 let cacheFilePath = ''
+
+const INVALID_USER_MSG =
+  'The catalog data looks corrupted. Please update QuranDesk or try again later.'
 
 function cacheFile(): string {
   if (!cacheFilePath) {
@@ -60,28 +66,42 @@ function manifestUrl(): string | null {
   return url && url.trim() ? url.trim() : null
 }
 
+function invalid(detail: string): never {
+  throw Object.assign(
+    new Error(INVALID_USER_MSG),
+    appError('manifest/invalid', INVALID_USER_MSG, detail)
+  )
+}
+
 function validate(payload: unknown): RemoteManifest {
   if (!payload || typeof payload !== 'object') {
-    throw new Error('Manifest payload is not an object')
+    invalid('payload is not an object')
   }
   const m = payload as Record<string, unknown>
 
   if (typeof m.schema_version !== 'number') {
-    throw new Error('Manifest is missing `schema_version`')
+    invalid('missing schema_version')
   }
   if (m.schema_version !== SUPPORTED_SCHEMA) {
-    throw new Error(
-      `Unsupported manifest schema_version ${m.schema_version}. This app supports v${SUPPORTED_SCHEMA}. Update QuranDesk to load this catalog.`
+    const userMessage =
+      'This catalog is newer than your version of QuranDesk. Please update the app.'
+    throw Object.assign(
+      new Error(userMessage),
+      appError(
+        'manifest/unsupported-version',
+        userMessage,
+        `saw v${m.schema_version}, app supports v${SUPPORTED_SCHEMA}`
+      )
     )
   }
   if (typeof m.updated_at !== 'string') {
-    throw new Error('Manifest is missing `updated_at`')
+    invalid('missing updated_at')
   }
   if (typeof m.audio_base_url !== 'string' || !m.audio_base_url.trim()) {
-    throw new Error('Manifest is missing `audio_base_url`')
+    invalid('missing audio_base_url')
   }
   if (!Array.isArray(m.reciters)) {
-    throw new Error('Manifest `reciters` is not an array')
+    invalid('reciters is not an array')
   }
 
   // Permissive on individual entries: skip malformed reciters rather than
@@ -130,11 +150,15 @@ export async function loadCache(): Promise<boolean> {
 
 /** Fetch from network, validate, persist, broadcast `manifest:updated`. */
 export async function refresh(): Promise<
-  { ok: true; updatedAt: string } | { ok: false; error: string }
+  { ok: true; updatedAt: string } | { ok: false; error: AppError }
 > {
   const url = manifestUrl()
   if (!url) {
-    lastError = 'Manifest URL is not configured. Set MAIN_VITE_MANIFEST_URL in .env.'
+    lastError = appError(
+      'manifest/not-configured',
+      "QuranDesk isn't fully set up: the catalog server isn't configured. Please reinstall or contact support.",
+      'MAIN_VITE_MANIFEST_URL is unset at build time'
+    )
     events.emit('updated')
     return { ok: false, error: lastError }
   }
@@ -149,7 +173,14 @@ export async function refresh(): Promise<
       cache: 'no-store'
     })
     if (!resp.ok) {
-      throw new Error(`HTTP ${resp.status} ${resp.statusText} while fetching manifest`)
+      throw Object.assign(
+        new Error("Couldn't reach the catalog. Check your internet connection and try again."),
+        appError(
+          'manifest/fetch-failed',
+          "Couldn't reach the catalog. Check your internet connection and try again.",
+          `HTTP ${resp.status} ${resp.statusText} while fetching ${url}`
+        )
+      )
     }
     const payload = (await resp.json()) as unknown
     const validated = validate(payload)
@@ -166,7 +197,17 @@ export async function refresh(): Promise<
     events.emit('updated')
     return { ok: true, updatedAt: validated.updated_at }
   } catch (e) {
-    lastError = e instanceof Error ? e.message : String(e)
+    // Errors thrown from validate/fetch-not-ok above carry AppError fields on
+    // the Error object — copy them into a plain object so IPC structured-clone
+    // serializes cleanly. Anything else (network / JSON parse) is wrapped as a
+    // generic fetch-failed.
+    lastError = isAppError(e)
+      ? { code: e.code, userMessage: e.userMessage, ...(e.detail ? { detail: e.detail } : {}) }
+      : appError(
+          'manifest/fetch-failed',
+          "Couldn't reach the catalog. Check your internet connection and try again.",
+          e
+        )
     fetching = false
     events.emit('updated')
     return { ok: false, error: lastError }

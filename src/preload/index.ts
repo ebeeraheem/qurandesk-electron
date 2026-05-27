@@ -40,6 +40,9 @@ const api: QuranDeskAPI = {
   checkForUpdates: () => ipcRenderer.invoke(IPC.checkForUpdates),
   installUpdateOnQuit: () => ipcRenderer.invoke(IPC.installUpdateOnQuit),
 
+  // Diagnostics
+  revealLogFile: () => ipcRenderer.invoke(IPC.revealLogFile),
+
   on: ((event: string, cb: (...args: unknown[]) => void) => {
     const listener = (_: Electron.IpcRendererEvent, ...args: unknown[]): void => cb(...args)
     ipcRenderer.on(event, listener)

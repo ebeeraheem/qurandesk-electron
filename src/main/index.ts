@@ -1,4 +1,5 @@
 import { app, shell, BrowserWindow, ipcMain } from 'electron'
+import log from 'electron-log/main'
 import type { Settings, LastPlayback } from '../shared/api'
 import { join } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
@@ -21,6 +22,15 @@ import { getStorageUsage } from './storage'
 import { getSettings, updateSettings } from './settings'
 import { getLastPlayback, setLastPlayback } from './playback'
 import * as updater from './updater'
+import { throwAppError } from './errors'
+
+// Logging — set up before anything else so even startup errors land on disk.
+// File path is electron-log's default: <userData>/logs/main.log per platform.
+log.initialize()
+log.transports.file.level = 'info'
+log.transports.console.level = is.dev ? 'debug' : 'warn'
+// Route bare console.* calls (ours and from libs) through the same transports.
+Object.assign(console, log.functions)
 
 // Privileged scheme registration MUST happen before app is ready.
 registerProtocolScheme()
@@ -68,14 +78,14 @@ function broadcast(channel: string, ...args: unknown[]): void {
 
 function validateReciterId(id: unknown): string {
   if (typeof id !== 'string' || !/^[a-z0-9-]+$/.test(id)) {
-    throw new Error(`Invalid reciter id: ${String(id)}`)
+    throwAppError('input/invalid-reciter-id', 'Something went wrong. Please try again.', String(id))
   }
   return id
 }
 
 function validateSurah(n: unknown): number {
   if (typeof n !== 'number' || !Number.isInteger(n) || n < 1 || n > 114) {
-    throw new Error(`Invalid surah number: ${String(n)}`)
+    throwAppError('input/invalid-surah', 'Something went wrong. Please try again.', String(n))
   }
   return n
 }
@@ -175,6 +185,12 @@ function registerIpcHandlers(): void {
   // Auto-updater.
   ipcMain.handle(IPC.checkForUpdates, async () => updater.checkForUpdates())
   ipcMain.handle(IPC.installUpdateOnQuit, async () => updater.installUpdateOnQuit())
+
+  // Diagnostics — open the OS file explorer at the log file. The log file is
+  // owned by electron-log; we don't expose its path text over IPC, just open it.
+  ipcMain.handle(IPC.revealLogFile, async () => {
+    shell.showItemInFolder(log.transports.file.getFile().path)
+  })
 }
 
 app.whenReady().then(async () => {

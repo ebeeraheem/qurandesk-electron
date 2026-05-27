@@ -1,5 +1,6 @@
 import { app } from 'electron'
 import { autoUpdater } from 'electron-updater'
+import log from 'electron-log/main'
 import { EventEmitter } from 'node:events'
 import type { UpdateStatus } from '../shared/api'
 
@@ -42,8 +43,9 @@ export function initUpdater(): void {
 
   autoUpdater.autoDownload = true
   autoUpdater.autoInstallOnAppQuit = true
-  // electron-updater logs to stdout by default; quiet it unless something fails.
-  autoUpdater.logger = null
+  // Route electron-updater's chatty logs into our log file so a failed update
+  // leaves a paper trail. console.* is already piped to electron-log by main.
+  autoUpdater.logger = log
 
   autoUpdater.on('update-available', (info) => {
     emit({ status: 'available', version: info.version })

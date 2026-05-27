@@ -1,13 +1,13 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import type { ReciterSummary } from '@shared/api'
+import type { AppError, ReciterSummary } from '@shared/api'
 import ReciterCard from '../components/ReciterCard'
 import { formatRelativeTime } from '../utils/format'
 
 export default function Reciters(): React.JSX.Element {
   const navigate = useNavigate()
   const [reciters, setReciters] = useState<ReciterSummary[]>([])
-  const [status, setStatus] = useState<{ cachedAt: number | null; lastError: string | null }>({
+  const [status, setStatus] = useState<{ cachedAt: number | null; lastError: AppError | null }>({
     cachedAt: null,
     lastError: null
   })
@@ -135,13 +135,15 @@ function EmptyOrError({
   lastError,
   onRetry
 }: Readonly<{
-  lastError: string | null
+  lastError: AppError | null
   onRetry: () => void
 }>): React.JSX.Element {
   return (
     <div className="grid place-items-center rounded-xl border border-border bg-bg-elev px-6 py-16 text-center">
       <div className="text-sm font-semibold text-fg">Couldn&apos;t load the catalog</div>
-      <p className="mt-2 max-w-sm text-sm text-muted">{lastError ?? 'No catalog available.'}</p>
+      <p className="mt-2 max-w-sm text-sm text-muted">
+        {lastError?.userMessage ?? 'No catalog available.'}
+      </p>
       <button
         onClick={onRetry}
         className="mt-4 rounded-md bg-primary px-4 py-1.5 text-sm font-semibold text-white"
