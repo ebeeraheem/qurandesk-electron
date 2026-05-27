@@ -1,7 +1,7 @@
 {
   "name": "qurandesk",
   "productName": "QuranDesk",
-  "version": "0.2.6",
+  "version": "0.2.7",
   "description": "A quiet listening room for complete Qur'an recitations — offline desktop player.",
   "main": "./out/main/index.js",
   "author": "Ebee Solutions",
