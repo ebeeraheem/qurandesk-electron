@@ -3,7 +3,6 @@ import { usePlayerStore } from './stores/player'
 import { useSettingsStore, updateSettings } from './stores/settings'
 import { useDownloadsStore } from './stores/downloads'
 import type { RepeatMode } from '@shared/api'
-import { getSurah } from '@shared/surahs'
 
 /**
  * Imperative wrapper around the single `<audio>` element owned by the
@@ -136,12 +135,12 @@ export async function playTrack(track: CurrentTrack): Promise<void> {
   let url: string | null
   try {
     url = await globalThis.api.getAudioUrl(track.reciterId, track.surahNumber)
-  } catch (e) {
-    handleUnavailable(track, e instanceof Error ? e.message : String(e))
+  } catch {
+    handleUnavailable(track)
     return
   }
   if (!url) {
-    handleUnavailable(track, null)
+    handleUnavailable(track)
     return
   }
 
@@ -168,10 +167,10 @@ export async function playTrack(track: CurrentTrack): Promise<void> {
  *    doesn't keep playing under a different surah label in the UI.
  *  - In `'download-then-play'` mode: enqueue the surah and stash it as
  *    `pendingTrack`. The `download:completed` bridge picks it up and plays.
- *  - In `'stop'` mode: surface a named hint via `errorMessage` so the user
- *    knows exactly what's missing.
+ *  - In `'stop'` mode: leave the missing track selected so the player
+ *    surfaces can offer download-and-play.
  */
-function handleUnavailable(track: CurrentTrack, networkError: string | null): void {
+function handleUnavailable(track: CurrentTrack): void {
   if (audioEl) {
     audioEl.pause()
     // Drop the src so a follow-up `togglePlay` doesn't resume the prior file;
@@ -188,15 +187,62 @@ function handleUnavailable(track: CurrentTrack, networkError: string | null): vo
       pendingTrack: track,
       errorMessage: null
     })
-    void globalThis.api.downloadSurah(track.reciterId, track.surahNumber).catch(() => undefined)
+    void enqueuePendingTrack(track).catch(() => {
+      usePlayerStore.setState({ pendingTrack: null, status: 'paused', errorMessage: null })
+    })
     return
   }
 
-  const name = getSurah(track.surahNumber)?.name_en ?? `Surah ${track.surahNumber}`
   usePlayerStore.setState({
-    status: 'error',
-    errorMessage: networkError ?? `${name} isn't downloaded yet.`
+    status: 'paused',
+    pendingTrack: null,
+    errorMessage: null
   })
+}
+
+async function enqueuePendingTrack(track: CurrentTrack): Promise<void> {
+  const status =
+    useDownloadsStore.getState().byReciter[track.reciterId]?.[track.surahNumber]?.status
+  if (status === 'failed') {
+    await globalThis.api.cancelDownload(track.reciterId, track.surahNumber)
+  }
+  await globalThis.api.downloadSurah(track.reciterId, track.surahNumber)
+}
+
+export async function downloadAndPlay(track: CurrentTrack): Promise<void> {
+  if (audioEl) {
+    audioEl.pause()
+    audioEl.removeAttribute('src')
+    audioEl.load()
+  }
+  usePlayerStore.setState({
+    current: track,
+    status: 'paused',
+    position: 0,
+    duration: 0,
+    errorMessage: null,
+    pendingTrack: track
+  })
+  try {
+    await enqueuePendingTrack(track)
+  } catch {
+    usePlayerStore.setState({ pendingTrack: null, status: 'paused', errorMessage: null })
+  }
+}
+
+export async function cancelTrackDownload(track: CurrentTrack): Promise<void> {
+  try {
+    await globalThis.api.cancelDownload(track.reciterId, track.surahNumber)
+  } catch {
+    return
+  }
+  const { pendingTrack } = usePlayerStore.getState()
+  if (
+    pendingTrack?.reciterId === track.reciterId &&
+    pendingTrack.surahNumber === track.surahNumber
+  ) {
+    usePlayerStore.setState({ pendingTrack: null, status: 'paused', errorMessage: null })
+  }
 }
 
 export function togglePlay(): void {
@@ -222,6 +268,10 @@ export function pause(): void {
 export function seekTo(seconds: number): void {
   if (!audioEl) return
   if (!Number.isFinite(seconds)) return
+  const current = usePlayerStore.getState().current
+  if (!current) return
+  const download = useDownloadsStore.getState().byReciter[current.reciterId]?.[current.surahNumber]
+  if (download?.status !== 'downloaded') return
   audioEl.currentTime = Math.max(0, seconds)
   usePlayerStore.setState({ position: audioEl.currentTime })
 }
@@ -281,7 +331,7 @@ export function handleEnded(): void {
   const { current } = usePlayerStore.getState()
   if (!current) return
 
-  const { repeatMode, autoAdvanceMode } = useSettingsStore.getState().settings
+  const { repeatMode } = useSettingsStore.getState().settings
 
   if (repeatMode === 'one') {
     if (audioEl) {
@@ -295,23 +345,7 @@ export function handleEnded(): void {
   const nextNum = current.surahNumber + 1
   if (nextNum > 114) return // end of Qur'an; stop cleanly.
 
-  const nextStatus = useDownloadsStore.getState().byReciter[current.reciterId]?.[nextNum]?.status
-  if (nextStatus === 'downloaded') {
-    void playTrack({ ...current, surahNumber: nextNum })
-    return
-  }
-
-  if (autoAdvanceMode === 'download-then-play') {
-    usePlayerStore.setState({
-      pendingTrack: { ...current, surahNumber: nextNum },
-      errorMessage: null
-    })
-    globalThis.api.downloadSurah(current.reciterId, nextNum).catch(() => undefined)
-  } else {
-    usePlayerStore.setState({
-      errorMessage: `Next surah isn't downloaded.`
-    })
-  }
+  void playTrack({ ...current, surahNumber: nextNum })
 }
 
 // ---------------------------------------------------------------------------

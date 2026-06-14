@@ -20,9 +20,8 @@ type PlayerState = {
   speed: PlaybackSpeedValue
   errorMessage: string | null
   /**
-   * Set when auto-advance has triggered a download for the next surah; the
-   * track will start playing once `download:completed` fires with a matching
-   * reciter + surah pair. Cleared whenever the user manually moves the track.
+   * Set when the selected track should play after its priority download
+   * completes. Cleared whenever the user manually moves the track or cancels.
    */
   pendingTrack: CurrentTrack | null
 }

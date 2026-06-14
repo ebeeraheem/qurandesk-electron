@@ -181,6 +181,15 @@ export function useReciterDownloads(reciterId: string | undefined): SurahDownloa
   })
 }
 
+export function useTrackDownload(
+  reciterId: string | undefined,
+  surahNumber: number | undefined
+): SurahDownload | null {
+  const downloads = useReciterDownloads(reciterId)
+  if (!reciterId || !surahNumber) return null
+  return downloads[surahNumber - 1] ?? null
+}
+
 const DEFAULT_DOWNLOADS: SurahDownload[] = Array.from({ length: 114 }, (_, i) => ({
   reciterId: '',
   surahNumber: i + 1,

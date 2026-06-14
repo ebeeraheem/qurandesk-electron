@@ -13,10 +13,12 @@ import {
   cycleSpeed,
   playNext,
   playPrev,
-  seekTo,
-  togglePlay
+  seekTo
 } from '../audioEngine'
 import { formatTime } from '../utils/format'
+import PlaybackPrimaryAction from '../components/PlaybackPrimaryAction'
+import { useTrackDownload } from '../stores/downloads'
+import { getPlaybackAvailabilityLabel } from '../utils/playbackAvailability'
 
 /**
  * Expanded Now Playing view. Replaces the PlayerBar when navigated to.
@@ -28,9 +30,8 @@ export default function NowPlaying(): React.JSX.Element {
   const position = usePlayerStore((s) => s.position)
   const duration = usePlayerStore((s) => s.duration)
   const speed = usePlayerStore((s) => s.speed)
-  const pendingTrack = usePlayerStore((s) => s.pendingTrack)
-  const errorMessage = usePlayerStore((s) => s.errorMessage)
   const repeatMode = useSettingsStore((s) => s.settings.repeatMode)
+  const download = useTrackDownload(current?.reciterId, current?.surahNumber)
   const [reciter, setReciter] = useState<ReciterSummary | null>(null)
 
   // No track — bounce back. (Happens if the URL is opened directly with nothing playing.)
@@ -48,14 +49,13 @@ export default function NowPlaying(): React.JSX.Element {
     })
   }, [reciterId])
 
-  if (!current) return <></>
+  if (!current || !download) return <></>
   const surah = getSurah(current.surahNumber)
   if (!surah) return <></>
 
-  // Bismillah is omitted for Surah 1 (it IS the surah) and Surah 9 (the only
-  // surah that begins without it).
-  const showBismillah = current.surahNumber !== 1 && current.surahNumber !== 9
   const isPlaying = status === 'playing'
+  const isDownloaded = download.status === 'downloaded'
+  const availabilityLabel = getPlaybackAvailabilityLabel(download)
   const isRepeatOne = repeatMode === 'one'
   const seekMax = duration > 0 ? duration : 1
   const seekValue = duration > 0 ? position : 0
@@ -94,18 +94,9 @@ export default function NowPlaying(): React.JSX.Element {
         </div>
 
         <div className="mt-10 text-center">
-          {showBismillah && (
-            <div
-              dir="rtl"
-              className="text-lg text-muted"
-              style={{ fontFamily: 'var(--font-arabic, serif)' }}
-            >
-              بسم الله الرحمن الرحيم
-            </div>
-          )}
           <div
             dir="rtl"
-            className="mt-2 text-4xl font-bold text-fg"
+            className="text-4xl font-bold text-fg"
             style={{ fontFamily: 'var(--font-arabic, serif)' }}
           >
             {surah.name_ar}
@@ -126,11 +117,11 @@ export default function NowPlaying(): React.JSX.Element {
             step={0.1}
             value={seekValue}
             onChange={(e) => seekTo(Number(e.target.value))}
-            disabled={duration === 0}
+            disabled={!isDownloaded || duration === 0}
             aria-label="Seek"
             className="h-1 w-full cursor-pointer appearance-none rounded-full bg-bg-elev accent-primary disabled:cursor-not-allowed"
             style={
-              duration > 0
+              isDownloaded && duration > 0
                 ? {
                     background: `linear-gradient(to right, var(--color-primary) 0%, var(--color-primary) ${seekPct}%, var(--color-bg-elev) ${seekPct}%, var(--color-bg-elev) 100%)`
                   }
@@ -168,22 +159,12 @@ export default function NowPlaying(): React.JSX.Element {
               <path d="M6 6h2v12H6zM10 12l10-6v12z" />
             </svg>
           </button>
-          <button
-            onClick={togglePlay}
-            className="grid size-16 place-items-center rounded-full bg-primary text-white shadow-lg hover:opacity-90"
-            aria-label={isPlaying ? 'Pause' : 'Play'}
-          >
-            {isPlaying ? (
-              <svg viewBox="0 0 24 24" fill="currentColor" className="size-7">
-                <rect x="6" y="5" width="4" height="14" rx="1" />
-                <rect x="14" y="5" width="4" height="14" rx="1" />
-              </svg>
-            ) : (
-              <svg viewBox="0 0 24 24" fill="currentColor" className="size-7">
-                <path d="M8 5v14l11-7z" />
-              </svg>
-            )}
-          </button>
+          <PlaybackPrimaryAction
+            track={current}
+            download={download}
+            isPlaying={isPlaying}
+            size="large"
+          />
           <button
             onClick={() => void playNext()}
             disabled={!canGoNext()}
@@ -203,15 +184,13 @@ export default function NowPlaying(): React.JSX.Element {
           </button>
         </div>
 
-        {(pendingTrack || (errorMessage && (status === 'ended' || status === 'error'))) && (
+        {availabilityLabel && (
           <div
-            className={['mt-4 text-xs', status === 'error' ? 'text-danger' : 'text-muted'].join(
-              ' '
-            )}
+            className={
+              download.status === 'failed' ? 'mt-4 text-xs text-danger' : 'mt-4 text-xs text-muted'
+            }
           >
-            {pendingTrack
-              ? `Downloading ${getSurah(pendingTrack.surahNumber)?.name_en ?? `surah ${pendingTrack.surahNumber}`}…`
-              : errorMessage}
+            {availabilityLabel}
           </div>
         )}
       </div>

@@ -8,27 +8,30 @@ import {
   cycleSpeed,
   playNext,
   playPrev,
-  seekTo,
-  togglePlay
+  seekTo
 } from '../audioEngine'
 import { getSurah } from '@shared/surahs'
 import { formatTime } from '../utils/format'
 import type { RepeatMode } from '@shared/api'
+import PlaybackPrimaryAction from './PlaybackPrimaryAction'
+import { useTrackDownload } from '../stores/downloads'
+import { getPlaybackAvailabilityLabel } from '../utils/playbackAvailability'
 
-export default function PlayerBar(): React.JSX.Element {
+export default function PlayerBar(): React.JSX.Element | null {
   const navigate = useNavigate()
   const current = usePlayerStore((s) => s.current)
   const status = usePlayerStore((s) => s.status)
   const duration = usePlayerStore((s) => s.duration)
   const position = usePlayerStore((s) => s.position)
   const speed = usePlayerStore((s) => s.speed)
-  const pendingTrack = usePlayerStore((s) => s.pendingTrack)
-  const errorMessage = usePlayerStore((s) => s.errorMessage)
   const repeatMode = useSettingsStore((s) => s.settings.repeatMode)
+  const download = useTrackDownload(current?.reciterId, current?.surahNumber)
 
   const surah = current ? getSurah(current.surahNumber) : null
   const isPlaying = status === 'playing'
   const hasTrack = current !== null
+  const isDownloaded = download?.status === 'downloaded'
+  const availabilityLabel = download ? getPlaybackAvailabilityLabel(download) : null
 
   const onSeek = (e: React.ChangeEvent<HTMLInputElement>): void => {
     seekTo(Number(e.target.value))
@@ -36,6 +39,7 @@ export default function PlayerBar(): React.JSX.Element {
 
   const seekMax = duration > 0 ? duration : 1
   const seekValue = duration > 0 ? position : 0
+  if (!current || !surah || !download) return null
 
   return (
     <footer className="flex h-20 shrink-0 items-center gap-4 border-t border-border bg-bg px-5">
@@ -114,23 +118,12 @@ export default function PlayerBar(): React.JSX.Element {
               <path d="M6 6h2v12H6zM10 12l10-6v12z" />
             </svg>
           </button>
-          <button
-            onClick={togglePlay}
-            disabled={!hasTrack}
-            className="grid size-10 place-items-center rounded-full bg-primary text-white shadow-sm hover:opacity-90 disabled:opacity-40"
-            aria-label={isPlaying ? 'Pause' : 'Play'}
-          >
-            {isPlaying ? (
-              <svg viewBox="0 0 24 24" fill="currentColor" className="size-5">
-                <rect x="6" y="5" width="4" height="14" rx="1" />
-                <rect x="14" y="5" width="4" height="14" rx="1" />
-              </svg>
-            ) : (
-              <svg viewBox="0 0 24 24" fill="currentColor" className="size-5">
-                <path d="M8 5v14l11-7z" />
-              </svg>
-            )}
-          </button>
+          <PlaybackPrimaryAction
+            track={current}
+            download={download}
+            isPlaying={isPlaying}
+            size="compact"
+          />
           <button
             onClick={() => void playNext()}
             disabled={!canGoNext()}
@@ -159,11 +152,11 @@ export default function PlayerBar(): React.JSX.Element {
             step={0.1}
             value={seekValue}
             onChange={onSeek}
-            disabled={!hasTrack || duration === 0}
+            disabled={!isDownloaded || duration === 0}
             aria-label="Seek"
             className="h-1 flex-1 cursor-pointer appearance-none rounded-full bg-bg-elev accent-primary disabled:cursor-not-allowed"
             style={
-              hasTrack && duration > 0
+              isDownloaded && duration > 0
                 ? {
                     background: `linear-gradient(to right, var(--color-primary) 0%, var(--color-primary) ${(seekValue / seekMax) * 100}%, var(--color-bg-elev) ${(seekValue / seekMax) * 100}%, var(--color-bg-elev) 100%)`
                   }
@@ -173,13 +166,13 @@ export default function PlayerBar(): React.JSX.Element {
           <span className="tabular-nums">{formatTime(duration)}</span>
         </div>
 
-        {(pendingTrack || (errorMessage && (status === 'ended' || status === 'error'))) && (
+        {availabilityLabel && (
           <div
-            className={['text-[10px]', status === 'error' ? 'text-danger' : 'text-muted'].join(' ')}
+            className={
+              download.status === 'failed' ? 'text-[10px] text-danger' : 'text-[10px] text-muted'
+            }
           >
-            {pendingTrack
-              ? `Downloading ${getSurah(pendingTrack.surahNumber)?.name_en ?? `surah ${pendingTrack.surahNumber}`}…`
-              : errorMessage}
+            {availabilityLabel}
           </div>
         )}
       </div>

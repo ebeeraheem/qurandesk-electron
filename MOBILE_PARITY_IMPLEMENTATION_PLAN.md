@@ -171,6 +171,8 @@ and reconciliation behavior.
 
 ## Phase 3 - Make Playback The Primary Download Surface
 
+**Status:** Implemented
+
 ### Outcome
 
 The PlayerBar and Now Playing primary action adapt to the current surah's download state, and
