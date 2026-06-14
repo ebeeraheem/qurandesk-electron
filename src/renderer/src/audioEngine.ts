@@ -34,6 +34,11 @@ let pendingSrc: { url: string; seekTo: number } | null = null
 const PERSIST_INTERVAL_MS = 5_000
 let lastPersistAt = 0
 
+function reportDiagnostic(operation: string, error: unknown, context?: unknown): void {
+  const message = error instanceof Error ? (error.stack ?? error.message) : String(error)
+  void globalThis.api.reportDiagnostic(operation, message, context).catch(() => undefined)
+}
+
 // ---------------------------------------------------------------------------
 // Element lifecycle
 // ---------------------------------------------------------------------------
@@ -94,7 +99,8 @@ export async function restoreLastPlayback(): Promise<void> {
     const reciters = await globalThis.api.getReciters()
     const match = reciters.find((r) => r.id === last.reciterId)
     if (match) reciterName = match.name
-  } catch {
+  } catch (error) {
+    reportDiagnostic('playback/restore-catalog', error)
     /* catalog not ready; fall back to id */
   }
 
@@ -112,7 +118,13 @@ export async function restoreLastPlayback(): Promise<void> {
 
   // Pre-load so `audioEl.src` is real before the user hits play and so
   // `loadedmetadata` fires (populating duration in the UI).
-  const url = await globalThis.api.getAudioUrl(last.reciterId, last.surahNumber).catch(() => null)
+  const url = await globalThis.api.getAudioUrl(last.reciterId, last.surahNumber).catch((error) => {
+    reportDiagnostic('playback/restore-url', error, {
+      reciterId: last.reciterId,
+      surahNumber: last.surahNumber
+    })
+    return null
+  })
   if (url) {
     applySrc(url, last.positionSeconds)
   }
@@ -135,7 +147,11 @@ export async function playTrack(track: CurrentTrack): Promise<void> {
   let url: string | null
   try {
     url = await globalThis.api.getAudioUrl(track.reciterId, track.surahNumber)
-  } catch {
+  } catch (error) {
+    reportDiagnostic('playback/get-audio-url', error, {
+      reciterId: track.reciterId,
+      surahNumber: track.surahNumber
+    })
     handleUnavailable(track)
     return
   }
@@ -150,6 +166,12 @@ export async function playTrack(track: CurrentTrack): Promise<void> {
     try {
       await audioEl.play()
     } catch (e) {
+      if (!(e instanceof Error) || e.name !== 'AbortError') {
+        reportDiagnostic('playback/play', e, {
+          reciterId: track.reciterId,
+          surahNumber: track.surahNumber
+        })
+      }
       usePlayerStore.setState({
         status: 'paused',
         errorMessage: e instanceof Error && e.name !== 'AbortError' ? e.message : null
@@ -187,7 +209,11 @@ function handleUnavailable(track: CurrentTrack): void {
       pendingTrack: track,
       errorMessage: null
     })
-    void enqueuePendingTrack(track).catch(() => {
+    void enqueuePendingTrack(track).catch((error) => {
+      reportDiagnostic('playback/enqueue-pending', error, {
+        reciterId: track.reciterId,
+        surahNumber: track.surahNumber
+      })
       usePlayerStore.setState({ pendingTrack: null, status: 'paused', errorMessage: null })
     })
     return
@@ -225,7 +251,11 @@ export async function downloadAndPlay(track: CurrentTrack): Promise<void> {
   })
   try {
     await enqueuePendingTrack(track)
-  } catch {
+  } catch (error) {
+    reportDiagnostic('playback/download-and-play', error, {
+      reciterId: track.reciterId,
+      surahNumber: track.surahNumber
+    })
     usePlayerStore.setState({ pendingTrack: null, status: 'paused', errorMessage: null })
   }
 }
@@ -233,7 +263,11 @@ export async function downloadAndPlay(track: CurrentTrack): Promise<void> {
 export async function cancelTrackDownload(track: CurrentTrack): Promise<void> {
   try {
     await globalThis.api.cancelDownload(track.reciterId, track.surahNumber)
-  } catch {
+  } catch (error) {
+    reportDiagnostic('playback/cancel-download', error, {
+      reciterId: track.reciterId,
+      surahNumber: track.surahNumber
+    })
     return
   }
   const { pendingTrack } = usePlayerStore.getState()

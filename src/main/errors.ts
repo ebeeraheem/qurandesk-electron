@@ -1,5 +1,6 @@
 import log from 'electron-log/main'
 import type { AppError, AppErrorCode } from '../shared/api'
+import { recordDiagnostic } from './diagnostics'
 
 /**
  * Build an `AppError` and log it. Every user-facing error in the main process
@@ -15,6 +16,7 @@ export function appError(code: AppErrorCode, userMessage: string, detail?: unkno
         ? String(detail)
         : undefined
   log.error(`[${code}] ${userMessage}${detailStr ? `\n  detail: ${detailStr}` : ''}`)
+  recordDiagnostic(code, detail ?? userMessage, { userMessage })
   return detailStr ? { code, userMessage, detail: detailStr } : { code, userMessage }
 }
 

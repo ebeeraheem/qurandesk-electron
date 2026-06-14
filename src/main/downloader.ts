@@ -9,6 +9,7 @@ import { getDb } from './db'
 import { audioFilePath, getAudioRoot } from './protocol'
 import * as manifest from './manifest'
 import { appError, throwAppError } from './errors'
+import { recordDiagnostic } from './diagnostics'
 
 const CATALOG_NOT_LOADED_MSG = "The reciter catalog hasn't loaded yet. Try again in a moment."
 const DOWNLOAD_FAILED_MSG = 'Download failed. Check your internet connection and try again.'
@@ -90,13 +91,6 @@ export function onCompleted(cb: (p: { reciterId: string; surah: number }) => voi
   return () => events.off('completed', cb)
 }
 
-export function onReverted(
-  cb: (p: { reciterId: string; surahNumber: number }) => void
-): () => void {
-  events.on('reverted', cb)
-  return () => events.off('reverted', cb)
-}
-
 export function onLibraryChanged(cb: () => void): () => void {
   events.on('libraryChanged', cb)
   return () => events.off('libraryChanged', cb)
@@ -113,8 +107,7 @@ function emitCompleted(reciterId: string, surah: number): void {
 /**
  * Called from the `getAudioUrl` IPC handler when the DB says a surah is
  * downloaded but the file is no longer on disk. Removes the orphaned row and
- * notifies the renderer so it can surface a toast + flip the row state back
- * to `not_downloaded`.
+ * notifies the renderer so it can flip the row state back to `not_downloaded`.
  */
 export function notifyFileMissing(reciterId: string, surahNumber: number): void {
   const result = getDb()
@@ -129,8 +122,11 @@ export function notifyFileMissing(reciterId: string, surahNumber: number): void 
     progressBytes: 0,
     totalBytes: 0
   })
-  // And let the toast layer know exactly what happened.
-  events.emit('reverted', { reciterId, surahNumber })
+  recordDiagnostic('playback/missing-file', 'Downloaded audio file was missing.', {
+    reciterId,
+    surahNumber
+  })
+  events.emit('libraryChanged')
 }
 
 // ---------------------------------------------------------------------------
@@ -434,6 +430,10 @@ async function runJob(row: QueueRow): Promise<void> {
     }
     const msg = e instanceof Error ? e.message : String(e)
     log.error(`[download/failed] ${row.reciter_id}/${row.surah_number}`, e)
+    recordDiagnostic('download/failed', e, {
+      reciterId: row.reciter_id,
+      surahNumber: row.surah_number
+    })
     // If queue row still exists, mark failed.
     const stillThere = getDb().prepare('SELECT 1 FROM download_queue WHERE id = ?').get(row.id)
     if (stillThere) {
@@ -502,6 +502,11 @@ async function downloadWithRetries(row: QueueRow, signal: AbortSignal): Promise<
         error.retryAfterMs ?? BACKOFF_DELAYS_MS[Math.min(attempt, BACKOFF_DELAYS_MS.length - 1)]
       markRetrying(row)
       log.warn(`[download/retry] ${row.reciter_id}/${row.surah_number} in ${delay}ms`, error)
+      recordDiagnostic('download/retry', error, {
+        reciterId: row.reciter_id,
+        surahNumber: row.surah_number,
+        delayMs: delay
+      })
       await sleep(Math.min(delay, MAX_BACKOFF_MS), signal)
       markActive(row)
       attempt++

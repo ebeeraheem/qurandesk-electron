@@ -412,6 +412,8 @@ reciters, plus explicit refresh/reconciliation.
 
 ## Phase 7 - Add Privacy-Safe Diagnostics And Error Recovery
 
+**Status:** Implemented
+
 ### Outcome
 
 The desktop app records structured diagnostic context, exports a sanitized report, and recovers

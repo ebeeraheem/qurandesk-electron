@@ -42,6 +42,8 @@ export default function Settings(): React.JSX.Element {
   }>({ cachedAt: null, lastError: null })
   const [refreshing, setRefreshing] = useState(false)
   const [deleteAllOpen, setDeleteAllOpen] = useState(false)
+  const [exportingDiagnostics, setExportingDiagnostics] = useState(false)
+  const [diagnosticsSaved, setDiagnosticsSaved] = useState(false)
 
   useEffect(() => {
     globalThis.api
@@ -61,6 +63,19 @@ export default function Settings(): React.JSX.Element {
       await globalThis.api.refreshManifest()
     } finally {
       setRefreshing(false)
+    }
+  }
+
+  const onExportDiagnostics = async (): Promise<void> => {
+    setExportingDiagnostics(true)
+    setDiagnosticsSaved(false)
+    try {
+      const result = await globalThis.api.exportDiagnostics()
+      setDiagnosticsSaved(result.saved)
+    } catch {
+      setDiagnosticsSaved(false)
+    } finally {
+      setExportingDiagnostics(false)
     }
   }
 
@@ -191,14 +206,19 @@ export default function Settings(): React.JSX.Element {
 
       <Section title="Troubleshooting">
         <Row
-          label="Log file"
-          sub="Open the folder containing QuranDesk's diagnostic log. Attach it to bug reports."
+          label="Export diagnostics"
+          sub={
+            diagnosticsSaved
+              ? 'Diagnostics saved. Attach the JSON file to your bug report.'
+              : 'Save a privacy-safe report containing app state and recent errors.'
+          }
           control={
             <button
-              onClick={() => globalThis.api.revealLogFile()}
-              className="rounded-md border border-border bg-bg-elev px-3 py-1.5 text-xs font-semibold text-muted hover:text-fg"
+              onClick={() => void onExportDiagnostics()}
+              disabled={exportingDiagnostics}
+              className="rounded-md border border-border bg-bg-elev px-3 py-1.5 text-xs font-semibold text-muted hover:text-fg disabled:opacity-60"
             >
-              Reveal log file
+              {exportingDiagnostics ? 'Exporting…' : 'Export diagnostics'}
             </button>
           }
         />

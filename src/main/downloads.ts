@@ -132,10 +132,8 @@ export function buildReciterSummary(r: RemoteReciter): ReciterSummary {
  *  2. Rows present that the file is no longer there → DELETE the row
  *     (handles external deletion / corruption / a wiped audio folder).
  *
- * Step 2 runs silently — no toast at boot, since the user hasn't done
- * anything yet. The on-play reconciliation in `getAudioUrl` is where the
- * user-facing toast lives, for the case where a file goes missing during a
- * running session.
+ * Step 2 runs silently. On-play reconciliation in `getAudioUrl` updates live
+ * renderer state and records a diagnostic if a file disappears mid-session.
  */
 export async function reconcileFilesystem(): Promise<void> {
   const root = getAudioRoot()

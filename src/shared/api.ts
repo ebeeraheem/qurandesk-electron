@@ -107,6 +107,10 @@ export type LibrarySnapshot = {
   queue: QueueEntry[]
 }
 
+export type ExportDiagnosticsResult = {
+  saved: boolean
+}
+
 export type AppInfo = {
   version: string
   platform: NodeJS.Platform
@@ -160,17 +164,13 @@ export interface QuranDeskAPI {
   installUpdateOnQuit: () => Promise<void>
 
   // Diagnostics
-  /** Open the OS file explorer at the log file location for bug reporting. */
-  revealLogFile: () => Promise<void>
+  exportDiagnostics: () => Promise<ExportDiagnosticsResult>
+  reportDiagnostic: (operation: string, error: string, context?: unknown) => Promise<void>
 
   // Events — return unsubscribe function
   on: {
     (event: 'download:progress', cb: (p: SurahDownload) => void): () => void
     (event: 'download:completed', cb: (p: { reciterId: string; surah: number }) => void): () => void
-    (
-      event: 'download:reverted',
-      cb: (p: { reciterId: string; surahNumber: number }) => void
-    ): () => void
     (event: 'manifest:updated', cb: () => void): () => void
     (event: 'library:changed', cb: () => void): () => void
     (event: 'update:status', cb: (s: UpdateStatus) => void): () => void
@@ -182,8 +182,6 @@ export interface QuranDeskAPI {
 export const EVENTS = {
   downloadProgress: 'download:progress',
   downloadCompleted: 'download:completed',
-  /** Fires when the downloader detects a row whose file vanished from disk. */
-  downloadReverted: 'download:reverted',
   manifestUpdated: 'manifest:updated',
   libraryChanged: 'library:changed',
   updateStatus: 'update:status'
@@ -221,7 +219,8 @@ export const IPC = {
   checkForUpdates: 'updater:check',
   installUpdateOnQuit: 'updater:installOnQuit',
 
-  revealLogFile: 'system:revealLogFile'
+  exportDiagnostics: 'system:exportDiagnostics',
+  reportDiagnostic: 'system:reportDiagnostic'
 } as const
 
 export const DEFAULT_SETTINGS: Settings = {

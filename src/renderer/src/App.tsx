@@ -8,7 +8,6 @@ import Downloads from './routes/Downloads'
 import Settings from './routes/Settings'
 import NowPlaying from './routes/NowPlaying'
 import UpdateBanner from './components/UpdateBanner'
-import Toaster from './components/Toaster'
 
 export default function App(): React.JSX.Element {
   return (
@@ -30,7 +29,6 @@ export default function App(): React.JSX.Element {
       </div>
       <BottomBar />
       <AudioEngine />
-      <Toaster />
     </div>
   )
 }

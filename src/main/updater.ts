@@ -3,6 +3,7 @@ import { autoUpdater } from 'electron-updater'
 import log from 'electron-log/main'
 import { EventEmitter } from 'node:events'
 import type { UpdateStatus } from '../shared/api'
+import { recordDiagnostic } from './diagnostics'
 
 /**
  * Wraps `electron-updater` and normalises its loose event surface into our
@@ -63,6 +64,7 @@ export function initUpdater(): void {
     emit({ status: 'ready', version: info.version })
   })
   autoUpdater.on('error', (e) => {
+    recordDiagnostic('updater/event', e)
     emit({ status: 'error', message: e?.message ?? String(e) })
   })
 
@@ -80,6 +82,7 @@ export async function checkForUpdates(): Promise<UpdateStatus> {
     await autoUpdater.checkForUpdates()
     return lastStatus
   } catch (e) {
+    recordDiagnostic('updater/check', e)
     const status: UpdateStatus = {
       status: 'error',
       message: e instanceof Error ? e.message : String(e)

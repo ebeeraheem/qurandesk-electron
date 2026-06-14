@@ -28,6 +28,7 @@ import { getSettings, updateSettings } from './settings'
 import { getLastPlayback, setLastPlayback } from './playback'
 import * as updater from './updater'
 import { throwAppError } from './errors'
+import { exportDiagnostics, getRecentDiagnostics, recordDiagnostic } from './diagnostics'
 
 // Logging — set up before anything else so even startup errors land on disk.
 // File path is electron-log's default: <userData>/logs/main.log per platform.
@@ -95,6 +96,52 @@ function validateSurah(n: unknown): number {
   return n
 }
 
+async function buildDiagnosticsReport(): Promise<unknown> {
+  const catalog = manifest.getStatus()
+  const cachedManifest = manifest.getCachedManifest()
+  const storage = await getStorageUsage()
+  const completed = getDb()
+    .prepare(
+      `SELECT COUNT(*) AS files, COUNT(DISTINCT reciter_id) AS reciters,
+              COALESCE(SUM(size_bytes), 0) AS bytes
+       FROM downloads`
+    )
+    .get()
+  const queueRows = getDb()
+    .prepare('SELECT status, COUNT(*) AS count FROM download_queue GROUP BY status')
+    .all() as Array<{ status: string; count: number }>
+  return {
+    generatedAt: new Date().toISOString(),
+    app: {
+      version: app.getVersion(),
+      platform: process.platform,
+      packaged: app.isPackaged
+    },
+    catalog: {
+      loaded: cachedManifest !== null,
+      reciterCount: cachedManifest?.reciters.length ?? 0,
+      cachedAt: catalog.cachedAt ? new Date(catalog.cachedAt).toISOString() : null,
+      ageMs: catalog.cachedAt ? Math.max(0, Date.now() - catalog.cachedAt) : null,
+      fetching: catalog.fetching,
+      lastError: catalog.lastError
+        ? { code: catalog.lastError.code, userMessage: catalog.lastError.userMessage }
+        : null
+    },
+    settings: getSettings(),
+    downloads: {
+      completed,
+      queue: Object.fromEntries(queueRows.map((row) => [row.status, row.count]))
+    },
+    storage: {
+      appUsedBytes: storage.appUsedBytes,
+      totalBytes: storage.totalBytes,
+      freeBytes: storage.freeBytes
+    },
+    update: updater.getLastStatus(),
+    recentErrors: getRecentDiagnostics()
+  }
+}
+
 function registerIpcHandlers(): void {
   // Bootstrap.
   ipcMain.handle(IPC.ping, async () => 'pong' as const)
@@ -111,8 +158,8 @@ function registerIpcHandlers(): void {
     const s = validateSurah(surah)
     const exists = await audioFileIfExists(r, s)
     if (exists) return audioUrl(r, s)
-    // File isn't on disk. If the DB thinks it is, reconcile — fires events
-    // that flip the row state in the renderer and surface a toast.
+    // File isn't on disk. If the DB thinks it is, reconcile and notify the
+    // renderer so its player and download state can recover.
     const dbHasIt = !!getDb()
       .prepare('SELECT 1 FROM downloads WHERE reciter_id = ? AND surah_number = ?')
       .get(r, s)
@@ -162,10 +209,15 @@ function registerIpcHandlers(): void {
     return downloader.getActiveQueue()
   })
   ipcMain.handle(IPC.refreshLibrary, async () => {
-    await reconcileFilesystem()
-    return {
-      downloads: getCompletedDownloads(),
-      queue: downloader.getActiveQueue()
+    try {
+      await reconcileFilesystem()
+      return {
+        downloads: getCompletedDownloads(),
+        queue: downloader.getActiveQueue()
+      }
+    } catch (error) {
+      recordDiagnostic('library/refresh', error)
+      throw error
     }
   })
 
@@ -192,11 +244,25 @@ function registerIpcHandlers(): void {
   ipcMain.handle(IPC.checkForUpdates, async () => updater.checkForUpdates())
   ipcMain.handle(IPC.installUpdateOnQuit, async () => updater.installUpdateOnQuit())
 
-  // Diagnostics — open the OS file explorer at the log file. The log file is
-  // owned by electron-log; we don't expose its path text over IPC, just open it.
-  ipcMain.handle(IPC.revealLogFile, async () => {
-    shell.showItemInFolder(log.transports.file.getFile().path)
+  // Diagnostics.
+  ipcMain.handle(IPC.exportDiagnostics, async () => {
+    try {
+      return await exportDiagnostics(await buildDiagnosticsReport())
+    } catch (error) {
+      recordDiagnostic('diagnostics/build-report', error)
+      return { saved: false }
+    }
   })
+  ipcMain.handle(
+    IPC.reportDiagnostic,
+    async (_e, operation: unknown, error: unknown, context: unknown) => {
+      recordDiagnostic(
+        typeof operation === 'string' ? operation : 'renderer/unknown',
+        typeof error === 'string' ? error : 'Unknown renderer error',
+        context
+      )
+    }
+  )
 }
 
 app.whenReady().then(async () => {
@@ -222,7 +288,7 @@ app.whenReady().then(async () => {
     broadcast(EVENTS.manifestUpdated)
     void photos.precacheAll()
   })
-  manifest.refresh().catch(() => undefined)
+  manifest.refresh().catch((error) => recordDiagnostic('manifest/background-refresh', error))
   // If we restored a cached manifest above, pre-cache its photos immediately
   // (refresh() will re-run this too, but we want the cache to start filling
   // even before the network round-trip finishes).
@@ -231,7 +297,6 @@ app.whenReady().then(async () => {
   // Downloader event fan-out.
   downloader.onProgress((p) => broadcast(EVENTS.downloadProgress, p))
   downloader.onCompleted((p) => broadcast(EVENTS.downloadCompleted, p))
-  downloader.onReverted((p) => broadcast(EVENTS.downloadReverted, p))
   downloader.onLibraryChanged(() => broadcast(EVENTS.libraryChanged))
 
   // Boot the downloader: demote leftover 'active' rows and resume the queue.
