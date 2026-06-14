@@ -3,6 +3,7 @@ import { dirname } from 'node:path'
 import { EventEmitter } from 'node:events'
 import { Readable } from 'node:stream'
 import { pipeline } from 'node:stream/promises'
+import log from 'electron-log/main'
 import type { QueueEntry, SurahDownload } from '../shared/api'
 import { getDb } from './db'
 import { audioFilePath } from './protocol'
@@ -26,8 +27,8 @@ const DOWNLOAD_FAILED_MSG = 'Download failed. Check your internet connection and
  *      final name on success.
  *   4. On success: insert into `downloads`, delete the queue row, emit
  *      `download:completed`.
- *   5. On retryable failure: exponential backoff 1 / 4 / 16 s. After three
- *      attempts the row is marked `'failed'` with the error.
+ *   5. Transient failures retry with capped exponential backoff; permanent
+ *      failures are marked `'failed'` with technical detail retained in logs.
  *
  * Explicit single-surah and playback requests have priority over bulk queue
  * items. `cancelSurah` aborts (if active) and deletes both the queue row and
@@ -39,7 +40,22 @@ const DOWNLOAD_FAILED_MSG = 'Download failed. Check your internet connection and
 
 const MAX_CONCURRENT = 3
 const PROGRESS_EMIT_INTERVAL_MS = 500
-const BACKOFF_DELAYS_MS = [1000, 4000, 16000]
+const REQUEST_TIMEOUT_MS = 30_000
+const STREAM_INACTIVITY_TIMEOUT_MS = 30_000
+const MAX_BACKOFF_MS = 60_000
+const BACKOFF_DELAYS_MS = [1000, 4000, 16000, 30000, MAX_BACKOFF_MS]
+
+class DownloadError extends Error {
+  constructor(
+    message: string,
+    readonly transient: boolean,
+    readonly retryAfterMs?: number,
+    options?: ErrorOptions
+  ) {
+    super(message, options)
+    this.name = 'DownloadError'
+  }
+}
 
 const events = new EventEmitter()
 const activeJobs = new Map<string, AbortController>() // key = `${reciterId}:${surah}`
@@ -363,8 +379,9 @@ async function runJob(row: QueueRow): Promise<void> {
   })
 
   try {
-    await downloadWithRetries(row, controller.signal)
-    finalizeSuccess(row)
+    const downloadedBytes = await downloadWithRetries(row, controller.signal)
+    if (controller.signal.aborted) throw makeAbort()
+    await finalizeSuccess(row, downloadedBytes, controller.signal)
     emitCompleted(row.reciter_id, row.surah_number)
   } catch (e) {
     if (isAbort(e)) {
@@ -372,18 +389,23 @@ async function runJob(row: QueueRow): Promise<void> {
       return
     }
     const msg = e instanceof Error ? e.message : String(e)
+    log.error(`[download/failed] ${row.reciter_id}/${row.surah_number}`, e)
     // If queue row still exists, mark failed.
     const stillThere = getDb().prepare('SELECT 1 FROM download_queue WHERE id = ?').get(row.id)
     if (stillThere) {
       getDb()
-        .prepare(`UPDATE download_queue SET status = 'failed', error = ? WHERE id = ?`)
+        .prepare(
+          `UPDATE download_queue
+           SET status = 'failed', progress_bytes = 0, total_bytes = 0, error = ?
+           WHERE id = ?`
+        )
         .run(msg, row.id)
       emitProgress({
         reciterId: row.reciter_id,
         surahNumber: row.surah_number,
         status: 'failed',
-        progressBytes: row.progress_bytes,
-        totalBytes: row.total_bytes
+        progressBytes: 0,
+        totalBytes: 0
       })
     }
   } finally {
@@ -391,52 +413,59 @@ async function runJob(row: QueueRow): Promise<void> {
   }
 }
 
-function finalizeSuccess(row: QueueRow): void {
-  // Insert into downloads, delete from queue. Atomic.
+async function finalizeSuccess(
+  row: QueueRow,
+  expectedBytes: number,
+  signal: AbortSignal
+): Promise<void> {
+  // The DB trigger removes the corresponding queue row after this insert.
   const final = audioFilePath(row.reciter_id, row.surah_number)
-  if (!final) return // shouldn't happen — protocol module agreed on the path
-  // size_bytes is filled in by streamDownload via the stat below; do it sync here.
-  let size = 0
+  if (!final) throw new DownloadError(DOWNLOAD_FAILED_MSG, false)
+  // Verify the promoted final file immediately before recording completion.
+  let stat: Awaited<ReturnType<typeof fsp.stat>>
   try {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    size = require('node:fs').statSync(final).size as number
-  } catch {
+    stat = await fsp.stat(final)
+  } catch (error) {
     // File missing — treat as failure path.
-    return
+    throw new DownloadError(DOWNLOAD_FAILED_MSG, false, undefined, { cause: error })
   }
+  if (!stat.isFile() || stat.size <= 0 || stat.size !== expectedBytes) {
+    await fsp.unlink(final).catch(() => undefined)
+    throw new DownloadError(DOWNLOAD_FAILED_MSG, false)
+  }
+  if (signal.aborted) throw makeAbort()
   const tx = getDb().transaction(() => {
     getDb()
       .prepare(
         `INSERT OR REPLACE INTO downloads (reciter_id, surah_number, file_path, size_bytes, downloaded_at)
          VALUES (?, ?, ?, ?, ?)`
       )
-      .run(row.reciter_id, row.surah_number, final, size, Date.now())
-    getDb().prepare('DELETE FROM download_queue WHERE id = ?').run(row.id)
+      .run(row.reciter_id, row.surah_number, final, stat.size, Date.now())
   })
   tx()
 }
 
-async function downloadWithRetries(row: QueueRow, signal: AbortSignal): Promise<void> {
+async function downloadWithRetries(row: QueueRow, signal: AbortSignal): Promise<number> {
   let attempt = 0
-  let lastError: unknown
-  // 1 attempt + len(BACKOFF_DELAYS_MS) retries
-  while (attempt <= BACKOFF_DELAYS_MS.length) {
-    if (attempt > 0) {
-      await sleep(BACKOFF_DELAYS_MS[attempt - 1], signal)
-    }
+  while (true) {
     try {
-      await streamDownload(row, signal)
-      return
+      return await streamDownload(row, signal)
     } catch (e) {
       if (isAbort(e)) throw e
-      lastError = e
+      const error = classifyError(e)
+      if (!error.transient) throw error
+      const delay =
+        error.retryAfterMs ?? BACKOFF_DELAYS_MS[Math.min(attempt, BACKOFF_DELAYS_MS.length - 1)]
+      markRetrying(row)
+      log.warn(`[download/retry] ${row.reciter_id}/${row.surah_number} in ${delay}ms`, error)
+      await sleep(Math.min(delay, MAX_BACKOFF_MS), signal)
+      markActive(row)
+      attempt++
     }
-    attempt++
   }
-  throw lastError instanceof Error ? lastError : new Error(String(lastError))
 }
 
-async function streamDownload(row: QueueRow, signal: AbortSignal): Promise<void> {
+async function streamDownload(row: QueueRow, signal: AbortSignal): Promise<number> {
   const m = manifest.getCachedManifest()
   if (!m) throwAppError('catalog/not-loaded', CATALOG_NOT_LOADED_MSG)
   const url = `${m.audio_base_url}/${row.reciter_id}/${String(row.surah_number).padStart(3, '0')}.mp3`
@@ -452,26 +481,27 @@ async function streamDownload(row: QueueRow, signal: AbortSignal): Promise<void>
 
   await fsp.mkdir(dirname(final), { recursive: true })
 
-  const resp = await fetch(url, { signal })
+  const resp = await fetchWithTimeout(url, signal)
   if (!resp.ok) {
-    throw Object.assign(
-      new Error(DOWNLOAD_FAILED_MSG),
-      appError(
-        'download/http-failed',
-        DOWNLOAD_FAILED_MSG,
-        `HTTP ${resp.status} ${resp.statusText} fetching ${url}`
-      )
+    const transient = resp.status === 408 || resp.status === 429 || resp.status >= 500
+    const retryAfterMs = transient ? parseRetryAfter(resp.headers.get('retry-after')) : undefined
+    appError(
+      'download/http-failed',
+      DOWNLOAD_FAILED_MSG,
+      `HTTP ${resp.status} ${resp.statusText} fetching ${url}`
     )
+    throw new DownloadError(DOWNLOAD_FAILED_MSG, transient, retryAfterMs)
   }
   if (!resp.body) {
-    throw Object.assign(
-      new Error(DOWNLOAD_FAILED_MSG),
-      appError('download/empty-body', DOWNLOAD_FAILED_MSG, `empty body from ${url}`)
-    )
+    appError('download/empty-body', DOWNLOAD_FAILED_MSG, `empty body from ${url}`)
+    throw new DownloadError(DOWNLOAD_FAILED_MSG, true)
   }
 
   const totalHeader = resp.headers.get('content-length')
   const totalBytes = totalHeader ? Number(totalHeader) : 0
+  if (!Number.isFinite(totalBytes) || totalBytes < 0) {
+    throw new DownloadError(DOWNLOAD_FAILED_MSG, true)
+  }
   getDb()
     .prepare(`UPDATE download_queue SET total_bytes = ?, progress_bytes = 0 WHERE id = ?`)
     .run(totalBytes, row.id)
@@ -489,8 +519,19 @@ async function streamDownload(row: QueueRow, signal: AbortSignal): Promise<void>
   const source = Readable.fromWeb(
     resp.body as unknown as import('node:stream/web').ReadableStream<Uint8Array>
   )
+  const streamController = linkedController(signal)
+  let streamTimedOut = false
+  let inactivityTimer = setTimeout(() => {
+    streamTimedOut = true
+    streamController.abort()
+  }, STREAM_INACTIVITY_TIMEOUT_MS)
 
   source.on('data', (chunk: Buffer) => {
+    clearTimeout(inactivityTimer)
+    inactivityTimer = setTimeout(() => {
+      streamTimedOut = true
+      streamController.abort()
+    }, STREAM_INACTIVITY_TIMEOUT_MS)
     downloaded += chunk.length
     const now = Date.now()
     if (now - lastEmit >= PROGRESS_EMIT_INTERVAL_MS) {
@@ -511,15 +552,36 @@ async function streamDownload(row: QueueRow, signal: AbortSignal): Promise<void>
   })
 
   try {
-    await pipeline(source, writeStream, { signal })
+    await pipeline(source, writeStream, { signal: streamController.signal })
   } catch (e) {
     // Best-effort cleanup of the partial file if pipeline errored.
     await fsp.unlink(partial).catch(() => undefined)
-    throw e
+    if (signal.aborted) throw makeAbort()
+    if (streamTimedOut) throw new DownloadError(DOWNLOAD_FAILED_MSG, true, undefined, { cause: e })
+    throw classifyError(e)
+  } finally {
+    clearTimeout(inactivityTimer)
+    streamController.dispose()
   }
 
-  // Atomic rename — anything not `.partial` is guaranteed complete and playable.
-  await fsp.rename(partial, final)
+  if (downloaded <= 0 || (totalBytes > 0 && downloaded !== totalBytes)) {
+    await fsp.unlink(partial).catch(() => undefined)
+    throw new DownloadError(DOWNLOAD_FAILED_MSG, true)
+  }
+  const partialStat = await fsp.stat(partial).catch((error) => {
+    throw new DownloadError(DOWNLOAD_FAILED_MSG, false, undefined, { cause: error })
+  })
+  if (!partialStat.isFile() || partialStat.size !== downloaded) {
+    await fsp.unlink(partial).catch(() => undefined)
+    throw new DownloadError(DOWNLOAD_FAILED_MSG, true)
+  }
+
+  try {
+    await fsp.rename(partial, final)
+  } catch (error) {
+    await fsp.unlink(partial).catch(() => undefined)
+    throw new DownloadError(DOWNLOAD_FAILED_MSG, false, undefined, { cause: error })
+  }
 
   // Final progress emit so the UI moves to 100% before download:completed lands.
   emitProgress({
@@ -529,11 +591,107 @@ async function streamDownload(row: QueueRow, signal: AbortSignal): Promise<void>
     progressBytes: downloaded || totalBytes,
     totalBytes
   })
+  return downloaded
 }
 
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
+
+function markRetrying(row: QueueRow): void {
+  getDb()
+    .prepare(
+      `UPDATE download_queue
+       SET status = 'active', progress_bytes = 0, total_bytes = 0, error = NULL
+       WHERE id = ?`
+    )
+    .run(row.id)
+  emitProgress({
+    reciterId: row.reciter_id,
+    surahNumber: row.surah_number,
+    status: 'active',
+    progressBytes: 0,
+    totalBytes: 0
+  })
+}
+
+function markActive(row: QueueRow): void {
+  getDb().prepare(`UPDATE download_queue SET status = 'active' WHERE id = ?`).run(row.id)
+  emitProgress({
+    reciterId: row.reciter_id,
+    surahNumber: row.surah_number,
+    status: 'active',
+    progressBytes: 0,
+    totalBytes: 0
+  })
+}
+
+async function fetchWithTimeout(url: string, signal: AbortSignal): Promise<Response> {
+  const request = linkedController(signal)
+  let timedOut = false
+  const timer = setTimeout(() => {
+    timedOut = true
+    request.abort()
+  }, REQUEST_TIMEOUT_MS)
+  try {
+    return await fetch(url, { signal: request.signal })
+  } catch (error) {
+    if (signal.aborted) throw makeAbort()
+    if (timedOut) throw new DownloadError(DOWNLOAD_FAILED_MSG, true, undefined, { cause: error })
+    throw classifyError(error)
+  } finally {
+    clearTimeout(timer)
+    request.dispose()
+  }
+}
+
+function linkedController(parent: AbortSignal): AbortController & { dispose: () => void } {
+  const controller = new AbortController() as AbortController & { dispose: () => void }
+  const abort = (): void => controller.abort()
+  if (parent.aborted) controller.abort()
+  else parent.addEventListener('abort', abort, { once: true })
+  controller.dispose = () => parent.removeEventListener('abort', abort)
+  return controller
+}
+
+function parseRetryAfter(value: string | null): number | undefined {
+  if (!value) return undefined
+  const seconds = Number(value)
+  const delay = Number.isFinite(seconds) ? seconds * 1000 : Date.parse(value) - Date.now()
+  if (!Number.isFinite(delay)) return undefined
+  return Math.max(0, Math.min(delay, MAX_BACKOFF_MS))
+}
+
+function classifyError(error: unknown): DownloadError {
+  if (error instanceof DownloadError) return error
+  if (isAbort(error)) {
+    return new DownloadError(DOWNLOAD_FAILED_MSG, true, undefined, { cause: error })
+  }
+  if (error && typeof error === 'object' && 'code' in error) {
+    const code = String(error.code)
+    if (code === 'download/path-invalid') {
+      return new DownloadError(DOWNLOAD_FAILED_MSG, false, undefined, { cause: error })
+    }
+    if (
+      [
+        'EACCES',
+        'EPERM',
+        'ENOSPC',
+        'EROFS',
+        'ENOENT',
+        'EISDIR',
+        'EMFILE',
+        'ENFILE',
+        'ENAMETOOLONG'
+      ].includes(code)
+    ) {
+      return new DownloadError(DOWNLOAD_FAILED_MSG, false, undefined, { cause: error })
+    }
+  }
+  return new DownloadError(DOWNLOAD_FAILED_MSG, true, undefined, {
+    cause: error instanceof Error ? error : undefined
+  })
+}
 
 function sleep(ms: number, signal: AbortSignal): Promise<void> {
   return new Promise((resolve, reject) => {

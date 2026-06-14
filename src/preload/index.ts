@@ -22,6 +22,7 @@ const api: QuranDeskAPI = {
   deleteReciter: (reciterId) => ipcRenderer.invoke(IPC.deleteReciter, reciterId),
   deleteSurah: (reciterId, surah) => ipcRenderer.invoke(IPC.deleteSurah, reciterId, surah),
   getActiveQueue: () => ipcRenderer.invoke(IPC.getActiveQueue),
+  refreshLibrary: () => ipcRenderer.invoke(IPC.refreshLibrary),
 
   // Storage
   getStorageUsage: () => ipcRenderer.invoke(IPC.getStorageUsage),

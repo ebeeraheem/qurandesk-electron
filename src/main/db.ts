@@ -55,6 +55,13 @@ function migrate(d: Database.Database): void {
     CREATE INDEX IF NOT EXISTS idx_queue_reciter ON download_queue(reciter_id);
     CREATE INDEX IF NOT EXISTS idx_downloads_reciter ON downloads(reciter_id);
 
+    CREATE TRIGGER IF NOT EXISTS remove_completed_download_from_queue
+    AFTER INSERT ON downloads
+    BEGIN
+      DELETE FROM download_queue
+      WHERE reciter_id = NEW.reciter_id AND surah_number = NEW.surah_number;
+    END;
+
     -- Flat KV store for user settings. Values are JSON-encoded so we can
     -- distinguish booleans, numbers, and strings without a separate column.
     CREATE TABLE IF NOT EXISTS settings (
@@ -84,6 +91,14 @@ function migrate(d: Database.Database): void {
   // Pause/resume was removed. Normalize legacy rows before the downloader
   // reads them; old tables may still retain the wider legacy CHECK constraint.
   d.exec(`UPDATE download_queue SET status = 'queued' WHERE status = 'paused'`)
+  d.exec(`
+    DELETE FROM download_queue
+    WHERE EXISTS (
+      SELECT 1 FROM downloads
+      WHERE downloads.reciter_id = download_queue.reciter_id
+        AND downloads.surah_number = download_queue.surah_number
+    )
+  `)
 }
 
 export function close(): void {

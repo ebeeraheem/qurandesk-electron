@@ -1,6 +1,6 @@
 import { useEffect } from 'react'
 import { create } from 'zustand'
-import type { QueueEntry, SurahDownload } from '@shared/api'
+import type { LibrarySnapshot, QueueEntry, SurahDownload } from '@shared/api'
 
 /**
  * Renderer-side mirror of the downloader state, hydrated lazily per-reciter
@@ -18,13 +18,18 @@ type DownloadsState = {
   hydrated: Set<string>
   /** Flat queue mirror — populated when the Downloads page subscribes. */
   queue: QueueEntry[]
+  refreshing: boolean
 }
 
 export const useDownloadsStore = create<DownloadsState>(() => ({
   byReciter: {},
   hydrated: new Set(),
-  queue: []
+  queue: [],
+  refreshing: false
 }))
+
+let liveRevision = 0
+let refreshPromise: Promise<void> | null = null
 
 /** Replace one reciter's full download map atomically. */
 function setReciter(reciterId: string, downloads: SurahDownload[]): void {
@@ -42,6 +47,7 @@ function setReciter(reciterId: string, downloads: SurahDownload[]): void {
 
 /** Merge a single progress event into the per-reciter map. */
 function applyProgress(p: SurahDownload): void {
+  liveRevision++
   useDownloadsStore.setState((s) => {
     const map = { ...s.byReciter[p.reciterId] }
     if (p.status === 'not_downloaded') {
@@ -73,6 +79,7 @@ function applyProgress(p: SurahDownload): void {
 
 /** Mark a surah as downloaded — fires after `download:completed`. */
 function applyCompleted({ reciterId, surah }: { reciterId: string; surah: number }): void {
+  liveRevision++
   useDownloadsStore.setState((s) => {
     const map = { ...s.byReciter[reciterId] }
     map[surah] = { reciterId, surahNumber: surah, status: 'downloaded' }
@@ -81,6 +88,47 @@ function applyCompleted({ reciterId, surah }: { reciterId: string; surah: number
       queue: s.queue.filter((q) => !(q.reciterId === reciterId && q.surahNumber === surah))
     }
   })
+}
+
+function applySnapshot(snapshot: LibrarySnapshot): void {
+  useDownloadsStore.setState((s) => {
+    const byReciter: Record<string, Record<number, SurahDownload>> = {}
+    for (const download of snapshot.downloads) {
+      const map = byReciter[download.reciterId] ?? {}
+      map[download.surahNumber] = download
+      byReciter[download.reciterId] = map
+    }
+    for (const entry of snapshot.queue) {
+      const map = byReciter[entry.reciterId] ?? {}
+      map[entry.surahNumber] = {
+        reciterId: entry.reciterId,
+        surahNumber: entry.surahNumber,
+        status: entry.status,
+        progressBytes: entry.progressBytes,
+        totalBytes: entry.totalBytes
+      }
+      byReciter[entry.reciterId] = map
+    }
+    return { byReciter, queue: snapshot.queue, hydrated: new Set(s.hydrated) }
+  })
+}
+
+export function refreshLibraryState(): Promise<void> {
+  if (refreshPromise) return refreshPromise
+  useDownloadsStore.setState({ refreshing: true })
+  refreshPromise = (async () => {
+    while (true) {
+      const revision = liveRevision
+      const snapshot = await globalThis.api.refreshLibrary()
+      if (revision !== liveRevision) continue
+      applySnapshot(snapshot)
+      return
+    }
+  })().finally(() => {
+    refreshPromise = null
+    useDownloadsStore.setState({ refreshing: false })
+  })
+  return refreshPromise
 }
 
 // ---------------------------------------------------------------------------

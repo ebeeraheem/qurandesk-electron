@@ -102,6 +102,11 @@ export type QueueEntry = {
   createdAt: number
 }
 
+export type LibrarySnapshot = {
+  downloads: SurahDownload[]
+  queue: QueueEntry[]
+}
+
 export type AppInfo = {
   version: string
   platform: NodeJS.Platform
@@ -130,6 +135,7 @@ export interface QuranDeskAPI {
   deleteReciter: (reciterId: string) => Promise<void>
   deleteSurah: (reciterId: string, surah: number) => Promise<void>
   getActiveQueue: () => Promise<QueueEntry[]>
+  refreshLibrary: () => Promise<LibrarySnapshot>
 
   // Storage
   getStorageUsage: () => Promise<StorageUsage>
@@ -194,6 +200,7 @@ export const IPC = {
   deleteReciter: 'download:deleteReciter',
   deleteSurah: 'download:deleteSurah',
   getActiveQueue: 'download:getActiveQueue',
+  refreshLibrary: 'download:refreshLibrary',
 
   getStorageUsage: 'storage:getUsage',
   revealDownloadsFolder: 'storage:revealFolder',

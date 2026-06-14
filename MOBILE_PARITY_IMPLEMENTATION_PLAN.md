@@ -113,6 +113,8 @@ playback-required downloads run before bulk-download queue items.
 
 ## Phase 2 - Harden Download Reliability And Library Reconciliation
 
+**Status:** Implemented
+
 ### Outcome
 
 Desktop downloads adopt the mobile implementation's stronger timeout, retry, file-verification,

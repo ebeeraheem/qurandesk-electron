@@ -15,7 +15,12 @@ import {
 } from './protocol'
 import * as manifest from './manifest'
 import * as photos from './photos'
-import { buildReciterSummary, getSurahDownloads, reconcileFilesystem } from './downloads'
+import {
+  buildReciterSummary,
+  getCompletedDownloads,
+  getSurahDownloads,
+  reconcileFilesystem
+} from './downloads'
 import { close as closeDb, getDb } from './db'
 import * as downloader from './downloader'
 import { getStorageUsage } from './storage'
@@ -152,6 +157,13 @@ function registerIpcHandlers(): void {
   })
   ipcMain.handle(IPC.getActiveQueue, async () => {
     return downloader.getActiveQueue()
+  })
+  ipcMain.handle(IPC.refreshLibrary, async () => {
+    await reconcileFilesystem()
+    return {
+      downloads: getCompletedDownloads(),
+      queue: downloader.getActiveQueue()
+    }
   })
 
   // Storage.

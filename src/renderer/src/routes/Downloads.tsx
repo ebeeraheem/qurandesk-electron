@@ -3,11 +3,12 @@ import { Link } from 'react-router-dom'
 import type { QueueEntry, ReciterSummary, StorageUsage } from '@shared/api'
 import { getSurah } from '@shared/surahs'
 import ReciterAvatar from '../components/ReciterAvatar'
-import { useDownloadsStore } from '../stores/downloads'
+import { refreshLibraryState, useDownloadsStore } from '../stores/downloads'
 import { formatBytes } from '../utils/format'
 
 export default function Downloads(): React.JSX.Element {
   const queue = useDownloadsStore((s) => s.queue)
+  const refreshing = useDownloadsStore((s) => s.refreshing)
   const [reciters, setReciters] = useState<ReciterSummary[]>([])
   const [usage, setUsage] = useState<StorageUsage | null>(null)
 
@@ -60,7 +61,7 @@ export default function Downloads(): React.JSX.Element {
 
   return (
     <div className="px-10 py-8">
-      <header className="app-drag pb-6">
+      <header className="app-drag flex items-start justify-between gap-4 pb-6">
         <div>
           <h1 className="text-3xl font-bold">Downloads</h1>
           <p className="mt-1 text-sm text-muted">
@@ -76,6 +77,13 @@ export default function Downloads(): React.JSX.Element {
             )}
           </p>
         </div>
+        <button
+          disabled={refreshing}
+          onClick={() => void refreshLibraryState().then(reload)}
+          className="app-no-drag rounded-full bg-bg-elev px-4 py-2 text-xs font-semibold text-muted hover:text-fg disabled:opacity-50"
+        >
+          {refreshing ? 'Refreshing...' : 'Refresh library'}
+        </button>
       </header>
 
       {queue.length === 0 && completedReciters.length === 0 && partialReciters.length === 0 && (
@@ -297,11 +305,7 @@ function FailedRow({
         <div className="truncate font-semibold">
           {reciter?.name ?? entry.reciterId} · {surah?.name_en ?? `Surah ${entry.surahNumber}`}
         </div>
-        {entry.error && (
-          <div className="truncate text-xs text-danger" title={entry.error}>
-            {entry.error}
-          </div>
-        )}
+        <div className="truncate text-xs text-danger">Download failed. Try again.</div>
       </div>
       <div className="flex shrink-0 gap-2">
         <button

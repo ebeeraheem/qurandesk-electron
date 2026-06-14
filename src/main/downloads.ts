@@ -77,6 +77,18 @@ export function getSurahDownloads(reciterId: string): SurahDownload[] {
   return result
 }
 
+/** Sparse snapshot of every completed download, for full-library refreshes. */
+export function getCompletedDownloads(): SurahDownload[] {
+  const rows = getDb()
+    .prepare('SELECT reciter_id, surah_number FROM downloads ORDER BY reciter_id, surah_number')
+    .all() as Array<{ reciter_id: string; surah_number: number }>
+  return rows.map((row) => ({
+    reciterId: row.reciter_id,
+    surahNumber: row.surah_number,
+    status: 'downloaded'
+  }))
+}
+
 /** Aggregate stats for a single reciter, derived from the downloads table. */
 export function getReciterStats(reciterId: string): {
   downloadedSurahs: number
