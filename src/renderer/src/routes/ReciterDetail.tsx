@@ -30,9 +30,11 @@ export default function ReciterDetail(): React.JSX.Element {
     void reload(id)
     const off1 = globalThis.api.on('manifest:updated', () => void reload(id))
     const off2 = globalThis.api.on('download:completed', () => void reload(id))
+    const off3 = globalThis.api.on('library:changed', () => void reload(id))
     return () => {
       off1()
       off2()
+      off3()
     }
   }, [id])
 

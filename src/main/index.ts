@@ -155,6 +155,9 @@ function registerIpcHandlers(): void {
   ipcMain.handle(IPC.deleteReciter, async (_e, reciterId: unknown) => {
     await downloader.deleteReciter(validateReciterId(reciterId))
   })
+  ipcMain.handle(IPC.deleteAllDownloads, async () => {
+    await downloader.deleteAllDownloads()
+  })
   ipcMain.handle(IPC.getActiveQueue, async () => {
     return downloader.getActiveQueue()
   })
@@ -229,6 +232,7 @@ app.whenReady().then(async () => {
   downloader.onProgress((p) => broadcast(EVENTS.downloadProgress, p))
   downloader.onCompleted((p) => broadcast(EVENTS.downloadCompleted, p))
   downloader.onReverted((p) => broadcast(EVENTS.downloadReverted, p))
+  downloader.onLibraryChanged(() => broadcast(EVENTS.libraryChanged))
 
   // Boot the downloader: demote leftover 'active' rows and resume the queue.
   downloader.recoverFromCrash()

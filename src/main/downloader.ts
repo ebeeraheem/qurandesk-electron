@@ -6,7 +6,7 @@ import { pipeline } from 'node:stream/promises'
 import log from 'electron-log/main'
 import type { QueueEntry, SurahDownload } from '../shared/api'
 import { getDb } from './db'
-import { audioFilePath } from './protocol'
+import { audioFilePath, getAudioRoot } from './protocol'
 import * as manifest from './manifest'
 import { appError, throwAppError } from './errors'
 
@@ -95,6 +95,11 @@ export function onReverted(
 ): () => void {
   events.on('reverted', cb)
   return () => events.off('reverted', cb)
+}
+
+export function onLibraryChanged(cb: () => void): () => void {
+  events.on('libraryChanged', cb)
+  return () => events.off('libraryChanged', cb)
 }
 
 function emitProgress(p: SurahDownload): void {
@@ -254,18 +259,25 @@ export async function cancelSurah(reciterId: string, surah: number): Promise<voi
     progressBytes: 0,
     totalBytes: 0
   })
+  events.emit('libraryChanged')
 }
 
 export async function deleteSurah(reciterId: string, surah: number): Promise<void> {
-  // Cancel any in-flight job first.
-  await cancelSurah(reciterId, surah)
+  const key = `${reciterId}:${surah}`
+  activeJobs.get(key)?.abort()
+  getDb()
+    .prepare('DELETE FROM download_queue WHERE reciter_id = ? AND surah_number = ?')
+    .run(reciterId, surah)
+  await waitForJobs((jobKey) => jobKey === key)
+
+  const final = audioFilePath(reciterId, surah)
+  if (final) {
+    await removeFileIfPresent(`${final}.partial`)
+    await removeFileIfPresent(final)
+  }
   getDb()
     .prepare('DELETE FROM downloads WHERE reciter_id = ? AND surah_number = ?')
     .run(reciterId, surah)
-  const final = audioFilePath(reciterId, surah)
-  if (final) {
-    await fsp.unlink(final).catch(() => undefined)
-  }
   emitProgress({
     reciterId,
     surahNumber: surah,
@@ -273,6 +285,7 @@ export async function deleteSurah(reciterId: string, surah: number): Promise<voi
     progressBytes: 0,
     totalBytes: 0
   })
+  events.emit('libraryChanged')
 }
 
 export async function deleteReciter(reciterId: string): Promise<void> {
@@ -282,14 +295,14 @@ export async function deleteReciter(reciterId: string): Promise<void> {
   }
 
   getDb().prepare('DELETE FROM download_queue WHERE reciter_id = ?').run(reciterId)
-  getDb().prepare('DELETE FROM downloads WHERE reciter_id = ?').run(reciterId)
+  await waitForJobs((key) => key.startsWith(`${reciterId}:`))
 
-  // Best-effort: remove the audio folder for this reciter.
   const sampleFinal = audioFilePath(reciterId, 1)
   if (sampleFinal) {
     const folder = dirname(sampleFinal)
-    await fsp.rm(folder, { recursive: true, force: true }).catch(() => undefined)
+    await fsp.rm(folder, { recursive: true, force: true })
   }
+  getDb().prepare('DELETE FROM downloads WHERE reciter_id = ?').run(reciterId)
 
   // Tell the UI every row reset.
   for (let n = 1; n <= 114; n++) {
@@ -301,6 +314,37 @@ export async function deleteReciter(reciterId: string): Promise<void> {
       totalBytes: 0
     })
   }
+  events.emit('libraryChanged')
+}
+
+export async function deleteAllDownloads(): Promise<void> {
+  const affected = getDb()
+    .prepare(
+      `SELECT reciter_id, surah_number FROM downloads
+       UNION
+       SELECT reciter_id, surah_number FROM download_queue`
+    )
+    .all() as Array<{ reciter_id: string; surah_number: number }>
+
+  for (const controller of activeJobs.values()) controller.abort()
+  getDb().prepare('DELETE FROM download_queue').run()
+  await waitForJobs(() => true)
+
+  const root = getAudioRoot()
+  await fsp.rm(root, { recursive: true, force: true })
+  await fsp.mkdir(root, { recursive: true })
+  getDb().prepare('DELETE FROM downloads').run()
+
+  for (const row of affected) {
+    emitProgress({
+      reciterId: row.reciter_id,
+      surahNumber: row.surah_number,
+      status: 'not_downloaded',
+      progressBytes: 0,
+      totalBytes: 0
+    })
+  }
+  events.emit('libraryChanged')
 }
 
 // ---------------------------------------------------------------------------
@@ -613,6 +657,21 @@ function markRetrying(row: QueueRow): void {
     progressBytes: 0,
     totalBytes: 0
   })
+}
+
+async function waitForJobs(matches: (key: string) => boolean): Promise<void> {
+  while ([...activeJobs.keys()].some(matches)) {
+    await new Promise((resolve) => setTimeout(resolve, 25))
+  }
+}
+
+async function removeFileIfPresent(path: string): Promise<void> {
+  try {
+    await fsp.unlink(path)
+  } catch (error) {
+    if (error && typeof error === 'object' && 'code' in error && error.code === 'ENOENT') return
+    throw error
+  }
 }
 
 function markActive(row: QueueRow): void {

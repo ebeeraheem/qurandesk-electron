@@ -32,9 +32,11 @@ export default function Reciters(): React.JSX.Element {
     const off1 = globalThis.api.on('manifest:updated', () => void reload())
     // Re-fetch reciter list when a download completes so badge counts stay live.
     const off2 = globalThis.api.on('download:completed', () => void reload())
+    const off3 = globalThis.api.on('library:changed', () => void reload())
     return () => {
       off1()
       off2()
+      off3()
     }
   }, [])
 

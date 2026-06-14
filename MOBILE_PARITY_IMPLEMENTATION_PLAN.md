@@ -238,6 +238,8 @@ navigation can land on missing surahs so the user can download them directly.
 
 ## Phase 4 - Add Confirmed Destructive Actions
 
+**Status:** Implemented
+
 ### Outcome
 
 All deletion actions use one accessible custom confirmation dialog, and users can delete one

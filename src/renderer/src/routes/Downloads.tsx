@@ -5,6 +5,8 @@ import { getSurah } from '@shared/surahs'
 import ReciterAvatar from '../components/ReciterAvatar'
 import { refreshLibraryState, useDownloadsStore } from '../stores/downloads'
 import { formatBytes } from '../utils/format'
+import ConfirmationDialog from '../components/ConfirmationDialog'
+import { prepareReciterForDeletion } from '../audioEngine'
 
 export default function Downloads(): React.JSX.Element {
   const queue = useDownloadsStore((s) => s.queue)
@@ -28,9 +30,11 @@ export default function Downloads(): React.JSX.Element {
     void reload()
     const off1 = globalThis.api.on('manifest:updated', () => void reload())
     const off2 = globalThis.api.on('download:completed', () => void reload())
+    const off3 = globalThis.api.on('library:changed', () => void reload())
     return () => {
       off1()
       off2()
+      off3()
     }
   }, [])
 
@@ -340,44 +344,59 @@ function ReciterLine({
   badge?: string
   badgeTone?: 'success'
 }>): React.JSX.Element {
+  const [deleteOpen, setDeleteOpen] = useState(false)
   return (
-    <li className="flex items-center gap-3 px-5 py-3">
-      <ReciterAvatar reciter={reciter} className="h-10 w-10 shrink-0" />
-      <Link to={`/reciter/${reciter.id}`} className="min-w-0 flex-1 hover:text-primary">
-        <div className="truncate font-semibold">{reciter.name}</div>
-        <div className="text-xs text-muted">
-          {subtitle ?? `${reciter.downloadedSurahs} / 114 · ${formatBytes(reciter.totalSizeBytes)}`}
-        </div>
-      </Link>
-      {badge && (
-        <span
-          className={[
-            'rounded-full px-2.5 py-1 text-[11px] font-semibold',
-            badgeTone === 'success' ? 'bg-success/15 text-success' : 'bg-bg-tint text-primary'
-          ].join(' ')}
+    <>
+      <li className="flex items-center gap-3 px-5 py-3">
+        <ReciterAvatar reciter={reciter} className="h-10 w-10 shrink-0" />
+        <Link to={`/reciter/${reciter.id}`} className="min-w-0 flex-1 hover:text-primary">
+          <div className="truncate font-semibold">{reciter.name}</div>
+          <div className="text-xs text-muted">
+            {subtitle ??
+              `${reciter.downloadedSurahs} / 114 · ${formatBytes(reciter.totalSizeBytes)}`}
+          </div>
+        </Link>
+        {badge && (
+          <span
+            className={[
+              'rounded-full px-2.5 py-1 text-[11px] font-semibold',
+              badgeTone === 'success' ? 'bg-success/15 text-success' : 'bg-bg-tint text-primary'
+            ].join(' ')}
+          >
+            {badge}
+          </span>
+        )}
+        <button
+          onClick={() => setDeleteOpen(true)}
+          title="Delete all downloaded surahs for this reciter"
+          aria-label="Delete downloads"
+          className="grid size-8 shrink-0 place-items-center rounded-full text-muted hover:bg-danger/10 hover:text-danger"
         >
-          {badge}
-        </span>
-      )}
-      <button
-        onClick={() => globalThis.api.deleteReciter(reciter.id)}
-        title="Delete all downloaded surahs for this reciter"
-        aria-label="Delete downloads"
-        className="grid size-8 shrink-0 place-items-center rounded-full text-muted hover:bg-danger/10 hover:text-danger"
-      >
-        <svg
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="1.8"
-          className="size-4"
-        >
-          <path
-            d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m3 0v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"
-            strokeLinecap="round"
-          />
-        </svg>
-      </button>
-    </li>
+          <svg
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.8"
+            className="size-4"
+          >
+            <path
+              d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m3 0v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"
+              strokeLinecap="round"
+            />
+          </svg>
+        </button>
+      </li>
+      <ConfirmationDialog
+        open={deleteOpen}
+        title={`Delete ${reciter.name}'s downloads?`}
+        description="This removes every downloaded surah for this reciter, including unfinished downloads."
+        confirmLabel="Delete reciter downloads"
+        onClose={() => setDeleteOpen(false)}
+        onConfirm={() => {
+          prepareReciterForDeletion(reciter.id)
+          return globalThis.api.deleteReciter(reciter.id)
+        }}
+      />
+    </>
   )
 }

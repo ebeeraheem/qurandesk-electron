@@ -134,6 +134,7 @@ export interface QuranDeskAPI {
   cancelDownload: (reciterId: string, surah: number) => Promise<void>
   deleteReciter: (reciterId: string) => Promise<void>
   deleteSurah: (reciterId: string, surah: number) => Promise<void>
+  deleteAllDownloads: () => Promise<void>
   getActiveQueue: () => Promise<QueueEntry[]>
   refreshLibrary: () => Promise<LibrarySnapshot>
 
@@ -167,6 +168,7 @@ export interface QuranDeskAPI {
       cb: (p: { reciterId: string; surahNumber: number }) => void
     ): () => void
     (event: 'manifest:updated', cb: () => void): () => void
+    (event: 'library:changed', cb: () => void): () => void
     (event: 'update:status', cb: (s: UpdateStatus) => void): () => void
   }
 }
@@ -179,6 +181,7 @@ export const EVENTS = {
   /** Fires when the downloader detects a row whose file vanished from disk. */
   downloadReverted: 'download:reverted',
   manifestUpdated: 'manifest:updated',
+  libraryChanged: 'library:changed',
   updateStatus: 'update:status'
 } as const
 
@@ -199,6 +202,7 @@ export const IPC = {
   cancelDownload: 'download:cancel',
   deleteReciter: 'download:deleteReciter',
   deleteSurah: 'download:deleteSurah',
+  deleteAllDownloads: 'download:deleteAll',
   getActiveQueue: 'download:getActiveQueue',
   refreshLibrary: 'download:refreshLibrary',
 

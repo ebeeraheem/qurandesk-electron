@@ -2,7 +2,7 @@ import type { CurrentTrack, PlaybackSpeedValue } from './stores/player'
 import { usePlayerStore } from './stores/player'
 import { useSettingsStore, updateSettings } from './stores/settings'
 import { useDownloadsStore } from './stores/downloads'
-import type { RepeatMode } from '@shared/api'
+import type { RepeatMode, SurahDownload } from '@shared/api'
 
 /**
  * Imperative wrapper around the single `<audio>` element owned by the
@@ -265,6 +265,37 @@ export function pause(): void {
   audioEl?.pause()
 }
 
+function prepareCurrentForDeletion(matches: (track: CurrentTrack) => boolean): void {
+  const { current } = usePlayerStore.getState()
+  if (!current || !matches(current)) return
+  if (audioEl) {
+    audioEl.pause()
+    audioEl.removeAttribute('src')
+    audioEl.load()
+  }
+  usePlayerStore.setState({
+    status: 'paused',
+    position: 0,
+    duration: 0,
+    pendingTrack: null,
+    errorMessage: null
+  })
+}
+
+export function prepareSurahForDeletion(reciterId: string, surahNumber: number): void {
+  prepareCurrentForDeletion(
+    (track) => track.reciterId === reciterId && track.surahNumber === surahNumber
+  )
+}
+
+export function prepareReciterForDeletion(reciterId: string): void {
+  prepareCurrentForDeletion((track) => track.reciterId === reciterId)
+}
+
+export function prepareAllDownloadsForDeletion(): void {
+  prepareCurrentForDeletion(() => true)
+}
+
 export function seekTo(seconds: number): void {
   if (!audioEl) return
   if (!Number.isFinite(seconds)) return
@@ -382,5 +413,28 @@ export function initPendingTrackBridge(): void {
     ) {
       void playTrack(pendingTrack)
     }
+  })
+  globalThis.api.on('download:progress', (download: SurahDownload) => {
+    if (download.status !== 'not_downloaded') return
+    const { current } = usePlayerStore.getState()
+    if (
+      !current ||
+      current.reciterId !== download.reciterId ||
+      current.surahNumber !== download.surahNumber
+    ) {
+      return
+    }
+    if (audioEl) {
+      audioEl.pause()
+      audioEl.removeAttribute('src')
+      audioEl.load()
+    }
+    usePlayerStore.setState({
+      status: 'paused',
+      position: 0,
+      duration: 0,
+      pendingTrack: null,
+      errorMessage: null
+    })
   })
 }

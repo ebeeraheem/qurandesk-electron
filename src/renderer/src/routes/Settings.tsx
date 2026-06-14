@@ -9,6 +9,8 @@ import type {
 import { useSettingsStore, updateSettings } from '../stores/settings'
 import { useUpdaterStore } from '../stores/updater'
 import { formatAbsoluteDate, formatRelativeTime } from '../utils/format'
+import ConfirmationDialog from '../components/ConfirmationDialog'
+import { prepareAllDownloadsForDeletion } from '../audioEngine'
 
 const THEMES: Array<{ value: ThemePreference; label: string }> = [
   { value: 'system', label: 'System' },
@@ -39,6 +41,7 @@ export default function Settings(): React.JSX.Element {
     lastError: AppError | null
   }>({ cachedAt: null, lastError: null })
   const [refreshing, setRefreshing] = useState(false)
+  const [deleteAllOpen, setDeleteAllOpen] = useState(false)
 
   useEffect(() => {
     globalThis.api
@@ -147,6 +150,18 @@ export default function Settings(): React.JSX.Element {
             </button>
           }
         />
+        <Row
+          label="Delete all downloads"
+          sub="Remove every downloaded, queued, and unfinished surah from this device."
+          control={
+            <button
+              onClick={() => setDeleteAllOpen(true)}
+              className="rounded-full bg-danger/10 px-4 py-1.5 text-xs font-semibold text-danger hover:bg-danger/20"
+            >
+              Delete all
+            </button>
+          }
+        />
       </Section>
 
       <Section title="About">
@@ -188,6 +203,17 @@ export default function Settings(): React.JSX.Element {
           }
         />
       </Section>
+      <ConfirmationDialog
+        open={deleteAllOpen}
+        title="Delete all downloads?"
+        description="This removes every downloaded, queued, failed, and unfinished surah from this device. Your settings and playback position are preserved."
+        confirmLabel="Delete all downloads"
+        onClose={() => setDeleteAllOpen(false)}
+        onConfirm={() => {
+          prepareAllDownloadsForDeletion()
+          return globalThis.api.deleteAllDownloads()
+        }}
+      />
     </div>
   )
 }

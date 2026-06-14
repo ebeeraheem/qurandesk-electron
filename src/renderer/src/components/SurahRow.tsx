@@ -1,7 +1,9 @@
 import type { SurahDownload } from '@shared/api'
+import { useState } from 'react'
 import { getSurah } from '@shared/surahs'
-import { playTrack, togglePlay } from '../audioEngine'
+import { playTrack, prepareSurahForDeletion, togglePlay } from '../audioEngine'
 import { usePlayerStore } from '../stores/player'
+import ConfirmationDialog from './ConfirmationDialog'
 
 type Props = {
   download: SurahDownload
@@ -16,11 +18,10 @@ export default function SurahRow({
 }: Readonly<Props>): React.JSX.Element {
   const surah = getSurah(download.surahNumber)
   const current = usePlayerStore((s) => s.current)
-  const status = usePlayerStore((s) => s.status)
+  const [deleteOpen, setDeleteOpen] = useState(false)
 
   const isCurrent =
     current?.reciterId === reciterId && current?.surahNumber === download.surahNumber
-  const isPlayingTrack = isCurrent && status === 'playing'
   const isDownloaded = download.status === 'downloaded'
 
   const onActivate = (): void => {
@@ -38,69 +39,75 @@ export default function SurahRow({
       : 0
 
   return (
-    <div
-      onClick={onActivate}
-      role={isDownloaded ? 'button' : undefined}
-      tabIndex={isDownloaded ? 0 : -1}
-      onKeyDown={(e) => {
-        if (!isDownloaded) return
-        if (e.key === 'Enter' || e.key === ' ') {
-          e.preventDefault()
-          onActivate()
-        }
-      }}
-      className={[
-        'relative grid grid-cols-[44px_1fr_auto_84px] items-center gap-4 px-5 py-3 transition-colors',
-        isDownloaded ? 'cursor-pointer hover:bg-bg-elev' : 'cursor-default',
-        isCurrent && 'bg-bg-tint'
-      ]
-        .filter(Boolean)
-        .join(' ')}
-      style={
-        download.status === 'active'
-          ? {
-              backgroundImage: `linear-gradient(to right, var(--color-bg-tint) ${activePct}%, transparent ${activePct}%)`
-            }
-          : undefined
-      }
-    >
-      {isCurrent && (
-        <span aria-hidden className="absolute inset-y-2 left-0 w-1 rounded-r-md bg-primary" />
-      )}
-
-      <div className="text-right font-mono text-xs text-muted">{download.surahNumber}</div>
-
-      <div className="min-w-0">
-        <div
-          className={['truncate font-semibold', isCurrent && 'text-primary']
-            .filter(Boolean)
-            .join(' ')}
-        >
-          {surah.name_en}
-          <span className="ml-2 text-xs font-normal text-muted">· {surah.meaning_en}</span>
-        </div>
-        <RowStatus download={download} />
-      </div>
-
+    <>
       <div
-        dir="rtl"
-        className="text-xl text-fg/80"
-        style={{ fontFamily: 'var(--font-arabic, serif)' }}
-      >
-        {surah.name_ar}
-      </div>
-
-      <div className="flex justify-end">
-        <ActionButton
-          download={download}
-          isPlayingTrack={isPlayingTrack}
-          onPlay={(e) => {
-            e.stopPropagation()
+        onClick={onActivate}
+        role={isDownloaded ? 'button' : undefined}
+        tabIndex={isDownloaded ? 0 : -1}
+        onKeyDown={(e) => {
+          if (!isDownloaded) return
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault()
             onActivate()
-          }}
-        />
+          }
+        }}
+        className={[
+          'relative grid grid-cols-[44px_1fr_auto_84px] items-center gap-4 px-5 py-3 transition-colors',
+          isDownloaded ? 'cursor-pointer hover:bg-bg-elev' : 'cursor-default',
+          isCurrent && 'bg-bg-tint'
+        ]
+          .filter(Boolean)
+          .join(' ')}
+        style={
+          download.status === 'active'
+            ? {
+                backgroundImage: `linear-gradient(to right, var(--color-bg-tint) ${activePct}%, transparent ${activePct}%)`
+              }
+            : undefined
+        }
+      >
+        {isCurrent && (
+          <span aria-hidden className="absolute inset-y-2 left-0 w-1 rounded-r-md bg-primary" />
+        )}
+
+        <div className="text-right font-mono text-xs text-muted">{download.surahNumber}</div>
+
+        <div className="min-w-0">
+          <div
+            className={['truncate font-semibold', isCurrent && 'text-primary']
+              .filter(Boolean)
+              .join(' ')}
+          >
+            {surah.name_en}
+            <span className="ml-2 text-xs font-normal text-muted">· {surah.meaning_en}</span>
+          </div>
+          <RowStatus download={download} />
+        </div>
+
+        <div
+          dir="rtl"
+          className="text-xl text-fg/80"
+          style={{ fontFamily: 'var(--font-arabic, serif)' }}
+        >
+          {surah.name_ar}
+        </div>
+
+        <div className="flex justify-end">
+          <ActionButton download={download} onDelete={() => setDeleteOpen(true)} />
+        </div>
       </div>
-    </div>
+      <ConfirmationDialog
+        open={deleteOpen}
+        title={`Delete ${surah.name_en}?`}
+        description="This removes the downloaded audio from this device. You can download it again later."
+        confirmLabel="Delete surah"
+        onClose={() => setDeleteOpen(false)}
+        onConfirm={() => {
+          prepareSurahForDeletion(reciterId, download.surahNumber)
+          return globalThis.api.deleteSurah(reciterId, download.surahNumber)
+        }}
+      />
+    </>
   )
 }
 
@@ -124,31 +131,24 @@ function RowStatus({ download }: Readonly<{ download: SurahDownload }>): React.J
 
 function ActionButton({
   download,
-  isPlayingTrack,
-  onPlay
+  onDelete
 }: Readonly<{
   download: SurahDownload
-  isPlayingTrack: boolean
-  onPlay: (e: React.MouseEvent) => void
+  onDelete: () => void
 }>): React.JSX.Element {
   switch (download.status) {
     case 'downloaded':
       return (
         <button
-          onClick={onPlay}
-          className="grid size-8 place-items-center rounded-full bg-primary text-white shadow-sm hover:opacity-90"
-          aria-label={isPlayingTrack ? 'Pause' : 'Play'}
+          onClick={(event) => {
+            event.stopPropagation()
+            onDelete()
+          }}
+          className="grid size-8 place-items-center rounded-full text-muted hover:bg-danger/10 hover:text-danger"
+          aria-label="Delete downloaded surah"
+          title="Delete"
         >
-          {isPlayingTrack ? (
-            <svg viewBox="0 0 24 24" fill="currentColor" className="size-4">
-              <rect x="6" y="5" width="4" height="14" rx="1" />
-              <rect x="14" y="5" width="4" height="14" rx="1" />
-            </svg>
-          ) : (
-            <svg viewBox="0 0 24 24" fill="currentColor" className="size-4">
-              <path d="M8 5v14l11-7z" />
-            </svg>
-          )}
+          <DeleteIcon />
         </button>
       )
 
@@ -231,4 +231,15 @@ function ActionButton({
         </button>
       )
   }
+}
+
+function DeleteIcon(): React.JSX.Element {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="size-4">
+      <path
+        d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m3 0v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"
+        strokeLinecap="round"
+      />
+    </svg>
+  )
 }
