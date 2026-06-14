@@ -42,11 +42,12 @@ function migrate(d: Database.Database): void {
       id             TEXT    PRIMARY KEY,
       reciter_id     TEXT    NOT NULL,
       surah_number   INTEGER NOT NULL,
-      status         TEXT    NOT NULL CHECK (status IN ('queued','active','paused','failed')),
+      status         TEXT    NOT NULL CHECK (status IN ('queued','active','failed')),
       progress_bytes INTEGER DEFAULT 0,
       total_bytes    INTEGER DEFAULT 0,
       error          TEXT,
       created_at     INTEGER NOT NULL,
+      priority       INTEGER NOT NULL DEFAULT 0,
       UNIQUE (reciter_id, surah_number)
     );
 
@@ -71,6 +72,18 @@ function migrate(d: Database.Database): void {
       updated_at       INTEGER NOT NULL
     );
   `)
+
+  // CREATE TABLE IF NOT EXISTS does not alter databases from earlier releases.
+  const queueColumns = d.prepare('PRAGMA table_info(download_queue)').all() as Array<{
+    name: string
+  }>
+  if (!queueColumns.some((column) => column.name === 'priority')) {
+    d.exec('ALTER TABLE download_queue ADD COLUMN priority INTEGER NOT NULL DEFAULT 0')
+  }
+
+  // Pause/resume was removed. Normalize legacy rows before the downloader
+  // reads them; old tables may still retain the wider legacy CHECK constraint.
+  d.exec(`UPDATE download_queue SET status = 'queued' WHERE status = 'paused'`)
 }
 
 export function close(): void {

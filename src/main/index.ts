@@ -136,19 +136,13 @@ function registerIpcHandlers(): void {
 
   // Downloader.
   ipcMain.handle(IPC.downloadSurah, async (_e, reciterId: unknown, surah: unknown) => {
-    downloader.enqueueSurah(validateReciterId(reciterId), validateSurah(surah))
+    downloader.enqueueSurah(validateReciterId(reciterId), validateSurah(surah), { priority: true })
   })
   ipcMain.handle(IPC.downloadReciter, async (_e, reciterId: unknown) => {
     downloader.enqueueReciter(validateReciterId(reciterId))
   })
   ipcMain.handle(IPC.cancelDownload, async (_e, reciterId: unknown, surah: unknown) => {
     await downloader.cancelSurah(validateReciterId(reciterId), validateSurah(surah))
-  })
-  ipcMain.handle(IPC.pauseAll, async () => {
-    downloader.pauseAll()
-  })
-  ipcMain.handle(IPC.resumeAll, async () => {
-    downloader.resumeAll()
   })
   ipcMain.handle(IPC.deleteSurah, async (_e, reciterId: unknown, surah: unknown) => {
     await downloader.deleteSurah(validateReciterId(reciterId), validateSurah(surah))
@@ -158,9 +152,6 @@ function registerIpcHandlers(): void {
   })
   ipcMain.handle(IPC.getActiveQueue, async () => {
     return downloader.getActiveQueue()
-  })
-  ipcMain.handle(IPC.isPaused, async () => {
-    return downloader.isPaused()
   })
 
   // Storage.
@@ -227,7 +218,7 @@ app.whenReady().then(async () => {
   downloader.onCompleted((p) => broadcast(EVENTS.downloadCompleted, p))
   downloader.onReverted((p) => broadcast(EVENTS.downloadReverted, p))
 
-  // Boot the downloader: demote leftover 'active' rows + resume queue.
+  // Boot the downloader: demote leftover 'active' rows and resume the queue.
   downloader.recoverFromCrash()
 
   // Auto-updater event fan-out + initial check. No-op in unpacked dev.

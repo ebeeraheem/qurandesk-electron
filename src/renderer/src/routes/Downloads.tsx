@@ -8,7 +8,6 @@ import { formatBytes } from '../utils/format'
 
 export default function Downloads(): React.JSX.Element {
   const queue = useDownloadsStore((s) => s.queue)
-  const paused = useDownloadsStore((s) => s.paused)
   const [reciters, setReciters] = useState<ReciterSummary[]>([])
   const [usage, setUsage] = useState<StorageUsage | null>(null)
 
@@ -61,7 +60,7 @@ export default function Downloads(): React.JSX.Element {
 
   return (
     <div className="px-10 py-8">
-      <header className="app-drag flex items-end justify-between gap-6 pb-6">
+      <header className="app-drag pb-6">
         <div>
           <h1 className="text-3xl font-bold">Downloads</h1>
           <p className="mt-1 text-sm text-muted">
@@ -77,21 +76,6 @@ export default function Downloads(): React.JSX.Element {
             )}
           </p>
         </div>
-
-        {queue.length > 0 && (
-          <div className="app-no-drag flex items-center gap-2">
-            <button
-              onClick={() => {
-                if (paused) globalThis.api.resumeAll()
-                else globalThis.api.pauseAll()
-                useDownloadsStore.setState({ paused: !paused })
-              }}
-              className="rounded-full border border-border bg-bg-elev px-4 py-1.5 text-xs font-semibold text-muted hover:text-fg"
-            >
-              {paused ? 'Resume all' : 'Pause all'}
-            </button>
-          </div>
-        )}
       </header>
 
       {queue.length === 0 && completedReciters.length === 0 && partialReciters.length === 0 && (

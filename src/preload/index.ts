@@ -19,12 +19,9 @@ const api: QuranDeskAPI = {
   downloadSurah: (reciterId, surah) => ipcRenderer.invoke(IPC.downloadSurah, reciterId, surah),
   downloadReciter: (reciterId) => ipcRenderer.invoke(IPC.downloadReciter, reciterId),
   cancelDownload: (reciterId, surah) => ipcRenderer.invoke(IPC.cancelDownload, reciterId, surah),
-  pauseAll: () => ipcRenderer.invoke(IPC.pauseAll),
-  resumeAll: () => ipcRenderer.invoke(IPC.resumeAll),
   deleteReciter: (reciterId) => ipcRenderer.invoke(IPC.deleteReciter, reciterId),
   deleteSurah: (reciterId, surah) => ipcRenderer.invoke(IPC.deleteSurah, reciterId, surah),
   getActiveQueue: () => ipcRenderer.invoke(IPC.getActiveQueue),
-  isPaused: () => ipcRenderer.invoke(IPC.isPaused),
 
   // Storage
   getStorageUsage: () => ipcRenderer.invoke(IPC.getStorageUsage),

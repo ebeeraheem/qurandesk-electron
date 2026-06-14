@@ -18,15 +18,12 @@ type DownloadsState = {
   hydrated: Set<string>
   /** Flat queue mirror — populated when the Downloads page subscribes. */
   queue: QueueEntry[]
-  /** Whether pause-all is toggled. */
-  paused: boolean
 }
 
 export const useDownloadsStore = create<DownloadsState>(() => ({
   byReciter: {},
   hydrated: new Set(),
-  queue: [],
-  paused: false
+  queue: []
 }))
 
 /** Replace one reciter's full download map atomically. */
@@ -100,7 +97,6 @@ export function initDownloadsBridge(): void {
   globalThis.api.on('download:completed', (p: { reciterId: string; surah: number }) =>
     applyCompleted(p)
   )
-  globalThis.api.isPaused().then((paused) => useDownloadsStore.setState({ paused }))
   globalThis.api.getActiveQueue().then((queue) => useDownloadsStore.setState({ queue }))
 }
 

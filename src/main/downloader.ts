@@ -29,9 +29,9 @@ const DOWNLOAD_FAILED_MSG = 'Download failed. Check your internet connection and
  *   5. On retryable failure: exponential backoff 1 / 4 / 16 s. After three
  *      attempts the row is marked `'failed'` with the error.
  *
- * `pauseAll` / `resumeAll` toggle a process-wide flag so no new jobs start;
- * in-flight downloads keep running. `cancelSurah` aborts (if active) and
- * deletes both the queue row and the `.partial` file.
+ * Explicit single-surah and playback requests have priority over bulk queue
+ * items. `cancelSurah` aborts (if active) and deletes both the queue row and
+ * the `.partial` file.
  *
  * On boot, `recoverFromCrash()` demotes any leftover `'active'` rows back to
  * `'queued'` so a crash mid-download doesn't strand the row.
@@ -44,18 +44,18 @@ const BACKOFF_DELAYS_MS = [1000, 4000, 16000]
 const events = new EventEmitter()
 const activeJobs = new Map<string, AbortController>() // key = `${reciterId}:${surah}`
 let activeCount = 0
-let paused = false
 let recovered = false
 
 type QueueRow = {
   id: string
   reciter_id: string
   surah_number: number
-  status: 'queued' | 'active' | 'paused' | 'failed'
+  status: 'queued' | 'active' | 'failed'
   progress_bytes: number
   total_bytes: number
   error: string | null
   created_at: number
+  priority: number
 }
 
 const SURAH_FILE_RX = /^(\d{3})\.mp3$/
@@ -123,25 +123,37 @@ function isAlreadyDownloaded(reciterId: string, surah: number): boolean {
   return row !== undefined
 }
 
-function isInQueue(reciterId: string, surah: number): boolean {
+function getQueuedItem(reciterId: string, surah: number): { id: string; priority: number } | null {
   const row = getDb()
-    .prepare('SELECT 1 FROM download_queue WHERE reciter_id = ? AND surah_number = ?')
-    .get(reciterId, surah)
-  return row !== undefined
+    .prepare('SELECT id, priority FROM download_queue WHERE reciter_id = ? AND surah_number = ?')
+    .get(reciterId, surah) as { id: string; priority: number } | undefined
+  return row ?? null
 }
 
-export function enqueueSurah(reciterId: string, surah: number): void {
+export function enqueueSurah(
+  reciterId: string,
+  surah: number,
+  options?: { priority?: boolean }
+): void {
   if (!Number.isInteger(surah) || surah < 1 || surah > 114) return
   if (isAlreadyDownloaded(reciterId, surah)) return
-  if (isInQueue(reciterId, surah)) return
+  const existing = getQueuedItem(reciterId, surah)
+  if (existing) {
+    if (options?.priority && existing.priority === 0) {
+      getDb().prepare('UPDATE download_queue SET priority = 1 WHERE id = ?').run(existing.id)
+      tryStartNext()
+    }
+    return
+  }
 
   const id = `${reciterId}:${surah}`
+  const priority = options?.priority ? 1 : 0
   getDb()
     .prepare(
-      `INSERT INTO download_queue (id, reciter_id, surah_number, status, created_at)
-       VALUES (?, ?, ?, 'queued', ?)`
+      `INSERT INTO download_queue (id, reciter_id, surah_number, status, created_at, priority)
+       VALUES (?, ?, ?, 'queued', ?, ?)`
     )
-    .run(id, reciterId, surah, Date.now())
+    .run(id, reciterId, surah, Date.now(), priority)
 
   emitProgress({
     reciterId,
@@ -163,8 +175,9 @@ export function enqueueReciter(reciterId: string): number {
   // Bulk-insert anything not already downloaded or queued. Transaction keeps
   // it atomic and quick for 114 rows.
   const insert = getDb().prepare(
-    `INSERT OR IGNORE INTO download_queue (id, reciter_id, surah_number, status, created_at)
-     VALUES (?, ?, ?, 'queued', ?)`
+    `INSERT OR IGNORE INTO download_queue
+     (id, reciter_id, surah_number, status, created_at, priority)
+     VALUES (?, ?, ?, 'queued', ?, 0)`
   )
   const downloaded = new Set(
     (
@@ -189,7 +202,7 @@ export function enqueueReciter(reciterId: string): number {
   // Tell the UI about every enqueued row at once.
   for (let n = 1; n <= 114; n++) {
     if (downloaded.has(n)) continue
-    if (!isInQueue(reciterId, n)) continue // race-safety
+    if (!getQueuedItem(reciterId, n)) continue // race-safety
     emitProgress({
       reciterId,
       surahNumber: n,
@@ -275,29 +288,12 @@ export async function deleteReciter(reciterId: string): Promise<void> {
 }
 
 // ---------------------------------------------------------------------------
-// Pause / resume
-// ---------------------------------------------------------------------------
-
-export function pauseAll(): void {
-  paused = true
-}
-
-export function resumeAll(): void {
-  paused = false
-  tryStartNext()
-}
-
-export function isPaused(): boolean {
-  return paused
-}
-
-// ---------------------------------------------------------------------------
 // Queue introspection
 // ---------------------------------------------------------------------------
 
 export function getActiveQueue(): QueueEntry[] {
   const rows = getDb()
-    .prepare('SELECT * FROM download_queue ORDER BY created_at ASC')
+    .prepare('SELECT * FROM download_queue ORDER BY priority DESC, created_at ASC')
     .all() as QueueRow[]
   return rows.map(rowToEntry)
 }
@@ -321,11 +317,9 @@ function rowToEntry(r: QueueRow): QueueEntry {
 export function recoverFromCrash(): void {
   if (recovered) return
   recovered = true
-  // Anything still marked 'active' is leftover from a crash. Demote so the
-  // worker loop picks it up again.
+  // Anything still marked 'active' is leftover from a crash. Legacy paused
+  // rows are normalized by the DB migration before the downloader starts.
   getDb().exec(`UPDATE download_queue SET status = 'queued' WHERE status = 'active'`)
-  // Treat paused (UI didn't ship pause-individual) as queued too.
-  getDb().exec(`UPDATE download_queue SET status = 'queued' WHERE status = 'paused'`)
   tryStartNext()
 }
 
@@ -334,12 +328,12 @@ export function recoverFromCrash(): void {
 // ---------------------------------------------------------------------------
 
 function tryStartNext(): void {
-  while (!paused && activeCount < MAX_CONCURRENT) {
+  while (activeCount < MAX_CONCURRENT) {
     const next = getDb()
       .prepare(
         `SELECT * FROM download_queue
          WHERE status = 'queued'
-         ORDER BY created_at ASC
+         ORDER BY priority DESC, created_at ASC
          LIMIT 1`
       )
       .get() as QueueRow | undefined

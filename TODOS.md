@@ -68,9 +68,10 @@ Legend: ✅ done · 🚧 in progress · ⬜ not started
 - ✅ `src/main/downloader.ts` — worker pool (MAX_CONCURRENT=3), streamed `fetch` → `<file>.partial` → atomic rename
 - ✅ Exponential backoff 1s / 4s / 16s, then `'failed'` with error message
 - ✅ Cancel: AbortController per job, deletes queue row + `.partial` file
-- ✅ Queue persistence across restarts (`recoverFromCrash` demotes `'active'`/`'paused'` → `'queued'` on boot, then resumes)
+- ✅ Queue persistence across restarts (`recoverFromCrash` demotes leftover `'active'` rows to `'queued'`; migration normalizes legacy `'paused'` rows)
 - ✅ Progress events throttled to 500ms per active download (~2/sec)
-- ✅ `pauseAll` / `resumeAll` — process-wide flag prevents new starts; in-flight finish normally
+- ✅ Priority queue — explicit single-surah and playback-required requests run before bulk queue items; existing bulk items are promoted when explicitly requested
+- ✅ Removed pause/resume downloads and the legacy paused queue state
 - ✅ Filesystem reconciliation on boot — pre-existing audio files get INSERTed into `downloads` so they appear in the UI
 - ✅ All IPC validations (reciter-id regex, surah range) enforced at the handler boundary per spec §8
 - ✅ Renderer downloads store (`stores/downloads.ts`) — per-reciter map hydrated lazily, kept live via `download:progress` / `download:completed`
@@ -105,7 +106,7 @@ Legend: ✅ done · 🚧 in progress · ⬜ not started
 - ✅ `handleEnded` advances to next surah; `'stop'` mode leaves a hint, `'download-then-play'` enqueues + sets `pendingTrack`; `download:completed` resolves pending into playback
 - ✅ Prev / Next surah navigation (1↔114 clamped)
 - ✅ Position persistence — `playback_state` written on play / pause / ended + throttled ~5s during playback + on `beforeunload`
-- ✅ App boots restoring last track into `current` *and* pre-loads `audioEl.src` so the next play press resumes from the saved position. Removed the `resumePosition` one-shot — it was set but never made the audio element load anything, so play did nothing and duration stayed at 0. Now `applySrc(url, seekTo)` pushes the URL eagerly and queues it if `AudioEngine` hasn't mounted yet (covers the boot race between `restoreLastPlayback` and React's `useEffect`)
+- ✅ App boots restoring last track into `current` _and_ pre-loads `audioEl.src` so the next play press resumes from the saved position. Removed the `resumePosition` one-shot — it was set but never made the audio element load anything, so play did nothing and duration stayed at 0. Now `applySrc(url, seekTo)` pushes the URL eagerly and queues it if `AudioEngine` hasn't mounted yet (covers the boot race between `restoreLastPlayback` and React's `useEffect`)
 - ✅ `/now-playing` route — large avatar, bismillah (omitted for surah 1 + 9), big Arabic name, Latin + meaning, reciter + "Surah X of 114", scrubber, control cluster (continuous, prev, big play/pause, next, speed)
 - ✅ PlayerBar hidden while `/now-playing` is active; chevron-down collapses back; clicking PlayerBar's now-playing summary or expand icon opens NowPlaying
 

@@ -19,7 +19,7 @@ const SURAH_FILE_RX = /^(\d{3})\.mp3$/
 type QueueRow = {
   reciter_id: string
   surah_number: number
-  status: 'queued' | 'active' | 'paused' | 'failed'
+  status: 'queued' | 'active' | 'failed'
   progress_bytes: number
   total_bytes: number
   error: string | null
@@ -62,7 +62,7 @@ export function getSurahDownloads(reciterId: string): SurahDownload[] {
       result[n - 1] = {
         reciterId,
         surahNumber: n,
-        status: q.status === 'paused' ? 'queued' : q.status,
+        status: q.status,
         progressBytes: q.progress_bytes,
         totalBytes: q.total_bytes
       }

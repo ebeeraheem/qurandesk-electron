@@ -95,7 +95,7 @@ export type StorageUsage = {
 export type QueueEntry = {
   reciterId: string
   surahNumber: number
-  status: 'queued' | 'active' | 'paused' | 'failed'
+  status: 'queued' | 'active' | 'failed'
   progressBytes: number
   totalBytes: number
   error: string | null
@@ -127,12 +127,9 @@ export interface QuranDeskAPI {
   downloadSurah: (reciterId: string, surah: number) => Promise<void>
   downloadReciter: (reciterId: string) => Promise<void>
   cancelDownload: (reciterId: string, surah: number) => Promise<void>
-  pauseAll: () => Promise<void>
-  resumeAll: () => Promise<void>
   deleteReciter: (reciterId: string) => Promise<void>
   deleteSurah: (reciterId: string, surah: number) => Promise<void>
   getActiveQueue: () => Promise<QueueEntry[]>
-  isPaused: () => Promise<boolean>
 
   // Storage
   getStorageUsage: () => Promise<StorageUsage>
@@ -194,12 +191,9 @@ export const IPC = {
   downloadSurah: 'download:surah',
   downloadReciter: 'download:reciter',
   cancelDownload: 'download:cancel',
-  pauseAll: 'download:pauseAll',
-  resumeAll: 'download:resumeAll',
   deleteReciter: 'download:deleteReciter',
   deleteSurah: 'download:deleteSurah',
   getActiveQueue: 'download:getActiveQueue',
-  isPaused: 'download:isPaused',
 
   getStorageUsage: 'storage:getUsage',
   revealDownloadsFolder: 'storage:revealFolder',

@@ -61,6 +61,10 @@ it. Keep migrations additive and compatible with existing user databases. Use pr
 statements and transactions for grouped writes. Settings are a validated JSON-encoded KV
 store, with defaults defined in `src/shared/api.ts`.
 
+The download queue has no pause state. Explicit single-surah and playback-required requests
+are priority work; bulk reciter downloads are normal priority. Preserve promotion of an
+already-queued bulk item when the same surah is explicitly requested.
+
 The renderer uses:
 
 - `HashRouter`, because packaged Electron loads the renderer from a file URL.

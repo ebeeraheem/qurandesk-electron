@@ -50,6 +50,8 @@ Every phase must:
 
 ## Phase 1 - Simplify And Prioritize The Download Queue
 
+**Status:** Implemented
+
 ### Outcome
 
 The desktop downloader no longer supports pausing. Explicit single-surah and
