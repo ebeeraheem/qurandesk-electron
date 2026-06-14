@@ -65,6 +65,25 @@ The download queue has no pause state. Explicit single-surah and playback-requir
 are priority work; bulk reciter downloads are normal priority. Preserve promotion of an
 already-queued bulk item when the same surah is explicitly requested.
 
+Queue failures remain in SQLite until retried or removed, but raw queue errors must not cross
+the preload boundary or appear in UI. Cancel-all operations cancel only queued/active work;
+they preserve failed entries and completed files. Keep filesystem reconciliation and renderer
+queue snapshots synchronized through Refresh Library and library-change events.
+
+Destructive file operations require `ConfirmationDialog`. Cancellation/removal of queue-only
+work does not require confirmation. Downloaded surah rows must keep playback and deletion as
+separate keyboard-accessible controls.
+
+Diagnostics are owned by `src/main/diagnostics.ts`. Record meaningful caught failures with an
+operation name and bounded context, but never let diagnostics failures affect app behavior.
+Exports must remain aggregate and privacy-safe: do not include manifest/audio URLs,
+credentials, raw queue errors, or local user paths. Renderer errors should use the typed
+`reportDiagnostic` bridge and show friendly state, not technical strings or toasts.
+
+Automatic update scheduling belongs only in `src/main/updater.ts`: check on launch and every
+six hours, auto-download, and install on quit. Renderer code may hydrate update status and show
+the ready-to-restart banner, but must not add routine status UI or manual update checks.
+
 The renderer uses:
 
 - `HashRouter`, because packaged Electron loads the renderer from a file URL.
@@ -85,7 +104,7 @@ The renderer uses:
 - Keep comments for non-obvious invariants, security boundaries, lifecycle ordering, and
   recovery behavior.
 - User-facing main-process errors should use the typed `AppError` codes and helpers in
-  `src/main/errors.ts`; log technical detail and expose friendly copy.
+  `src/main/errors.ts`; record technical detail in diagnostics and expose only friendly copy.
 - Preserve unsubscribe cleanup for `globalThis.api.on(...)` subscriptions created by React
   effects or long-lived bridges.
 - Do not commit `.env` or secrets. Add documented placeholders to `.env.example` when adding

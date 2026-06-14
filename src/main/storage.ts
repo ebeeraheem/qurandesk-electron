@@ -5,8 +5,7 @@ import type { StorageUsage } from '../shared/api'
 import { getDb } from './db'
 
 /**
- * Reports disk usage figures for the sidebar block, the Settings page, and
- * the bulk-download pre-flight check.
+ * Reports aggregate disk usage for the Downloads header and diagnostics.
  *
  *  - `appUsedBytes` is what the user has actually pulled down: sum of
  *    `size_bytes` from the `downloads` table. This is the truth, not whatever
@@ -40,7 +39,6 @@ export async function getStorageUsage(): Promise<StorageUsage> {
   return {
     appUsedBytes: row.bytes,
     freeBytes,
-    totalBytes,
-    downloadDir
+    totalBytes
   }
 }

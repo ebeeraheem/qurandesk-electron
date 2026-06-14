@@ -14,13 +14,24 @@ export default function Reciters(): React.JSX.Element {
   const [loaded, setLoaded] = useState(false)
 
   const reload = async (): Promise<void> => {
-    const [list, status] = await Promise.all([
-      globalThis.api.getReciters(),
-      globalThis.api.getManifestStatus()
-    ])
-    setReciters(list.sort((a, b) => a.name.localeCompare(b.name)))
-    setStatus({ lastError: status.lastError, fetching: status.fetching })
-    setLoaded(true)
+    try {
+      const [list, status] = await Promise.all([
+        globalThis.api.getReciters(),
+        globalThis.api.getManifestStatus()
+      ])
+      setReciters(list.sort((a, b) => a.name.localeCompare(b.name)))
+      setStatus({ lastError: status.lastError, fetching: status.fetching })
+    } catch {
+      setStatus({
+        lastError: {
+          code: 'catalog/not-loaded',
+          userMessage: "Couldn't load the catalog. Please try again."
+        },
+        fetching: false
+      })
+    } finally {
+      setLoaded(true)
+    }
   }
 
   const refresh = async (): Promise<void> => {
@@ -85,7 +96,11 @@ export default function Reciters(): React.JSX.Element {
 function CatalogLoading(): React.JSX.Element {
   return (
     <div className="grid place-items-center rounded-xl border border-border bg-bg-elev px-6 py-16">
-      <div className="size-8 animate-spin rounded-full border-2 border-bg border-t-primary" />
+      <div
+        className="size-8 animate-spin rounded-full border-2 border-bg border-t-primary"
+        role="status"
+        aria-label="Loading reciters"
+      />
       <div className="mt-3 text-sm text-muted">Loading reciters...</div>
     </div>
   )
@@ -113,6 +128,7 @@ function SearchInput({
       <input
         value={value}
         onChange={(event) => onChange(event.target.value)}
+        aria-label="Search reciters"
         placeholder="Search reciters..."
         className="flex-1 bg-transparent text-fg placeholder:text-muted focus:outline-none"
       />

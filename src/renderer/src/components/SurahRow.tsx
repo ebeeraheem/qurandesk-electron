@@ -41,19 +41,9 @@ export default function SurahRow({
   return (
     <>
       <div
-        onClick={onActivate}
-        role={isDownloaded ? 'button' : undefined}
-        tabIndex={isDownloaded ? 0 : -1}
-        onKeyDown={(e) => {
-          if (!isDownloaded) return
-          if (e.key === 'Enter' || e.key === ' ') {
-            e.preventDefault()
-            onActivate()
-          }
-        }}
         className={[
           'relative grid grid-cols-[44px_1fr_auto_84px] items-center gap-4 px-5 py-3 transition-colors',
-          isDownloaded ? 'cursor-pointer hover:bg-bg-elev' : 'cursor-default',
+          isDownloaded ? 'hover:bg-bg-elev' : '',
           isCurrent && 'bg-bg-tint'
         ]
           .filter(Boolean)
@@ -70,27 +60,34 @@ export default function SurahRow({
           <span aria-hidden className="absolute inset-y-2 left-0 w-1 rounded-r-md bg-primary" />
         )}
 
-        <div className="text-right font-mono text-xs text-muted">{download.surahNumber}</div>
-
-        <div className="min-w-0">
-          <div
-            className={['truncate font-semibold', isCurrent && 'text-primary']
-              .filter(Boolean)
-              .join(' ')}
-          >
-            {surah.name_en}
-            <span className="ml-2 text-xs font-normal text-muted">· {surah.meaning_en}</span>
-          </div>
-          <RowStatus download={download} />
-        </div>
-
-        <div
-          dir="rtl"
-          className="text-xl text-fg/80"
-          style={{ fontFamily: 'var(--font-arabic, serif)' }}
+        <button
+          onClick={onActivate}
+          disabled={!isDownloaded}
+          aria-label={isCurrent ? `Toggle ${surah.name_en}` : `Play ${surah.name_en}`}
+          className="col-span-3 grid grid-cols-subgrid items-center gap-4 rounded-lg text-left disabled:cursor-default"
         >
-          {surah.name_ar}
-        </div>
+          <div className="text-right font-mono text-xs text-muted">{download.surahNumber}</div>
+
+          <div className="min-w-0">
+            <div
+              className={['truncate font-semibold', isCurrent && 'text-primary']
+                .filter(Boolean)
+                .join(' ')}
+            >
+              {surah.name_en}
+              <span className="ml-2 text-xs font-normal text-muted">· {surah.meaning_en}</span>
+            </div>
+            <RowStatus download={download} />
+          </div>
+
+          <div
+            dir="rtl"
+            className="text-xl text-fg/80"
+            style={{ fontFamily: 'var(--font-arabic, serif)' }}
+          >
+            {surah.name_ar}
+          </div>
+        </button>
 
         <div className="flex justify-end">
           <ActionButton download={download} onDelete={() => setDeleteOpen(true)} />
@@ -120,10 +117,14 @@ function RowStatus({ download }: Readonly<{ download: SurahDownload }>): React.J
         download.totalBytes && download.progressBytes
           ? Math.min(100, Math.round((download.progressBytes / download.totalBytes) * 100))
           : 0
-      return <div className="mt-0.5 text-[11px] text-primary">Downloading… {pct}%</div>
+      return (
+        <div className="mt-0.5 text-[11px] text-primary" role="status">
+          Downloading… {pct}%
+        </div>
+      )
     }
     case 'failed':
-      return <div className="mt-0.5 text-[11px] text-danger">Failed — click ↻ to retry</div>
+      return <div className="mt-0.5 text-[11px] text-danger">Download failed. Try again.</div>
     default:
       return null
   }

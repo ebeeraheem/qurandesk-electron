@@ -4,7 +4,6 @@ import { IPC, type QuranDeskAPI } from '../shared/api'
 
 const api: QuranDeskAPI = {
   getAppInfo: () => ipcRenderer.invoke(IPC.getAppInfo),
-  ping: () => ipcRenderer.invoke(IPC.ping),
 
   // Catalog
   getReciters: () => ipcRenderer.invoke(IPC.getReciters),

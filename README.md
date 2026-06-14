@@ -1,105 +1,96 @@
 # QuranDesk
 
-A quiet listening room for complete Qur'an recitations. Cross-platform desktop app (macOS, Windows, Linux) built on Electron + React + TypeScript. Recitations stream from a Cloudflare R2 bucket, are downloaded locally, and play back offline.
+QuranDesk is an offline-first desktop player for complete Qur'an recitations. It downloads
+surahs for local playback and runs on Windows, macOS, and Linux using Electron, React,
+TypeScript, Zustand, Tailwind CSS, and SQLite.
 
-> See [`TODOS.md`](./TODOS.md) for what has shipped per phase.
+## Product Behavior
 
-## Stack
+- The catalog is cached for offline browsing.
+- Playback uses downloaded audio only. Selecting a missing surah offers download-and-play.
+- Explicit surah requests, retries, and playback-needed downloads are prioritized ahead of
+  bulk reciter downloads.
+- Sequential playback can stop at a missing surah or auto-download it before continuing.
+- The Downloads page separates active work, failures, and reciters with audio on device.
+- Delete-surah, delete-reciter, and delete-all actions require confirmation.
+- Settings can export a privacy-safe diagnostics JSON report. Raw logs and local paths are not
+  exposed in the UI.
+- Updates check and download silently on launch and every six hours. A banner appears only
+  when an update is ready to restart; ignored updates install on normal quit.
 
-| Concern     | Choice                               |
-| ----------- | ------------------------------------ |
-| Runtime     | Electron 39                          |
-| Build       | electron-vite 5 + Vite 7             |
-| UI          | React 19 + TypeScript                |
-| Styling     | Tailwind CSS v4 (CSS-first `@theme`) |
-| State       | Zustand                              |
-| Router      | react-router-dom 7 (`HashRouter`)    |
-| Storage     | better-sqlite3 (WAL)                 |
-| Auto-update | electron-updater → GitHub Releases   |
+See [TODOS.md](./TODOS.md) for the shipped feature summary and remaining release decisions.
 
 ## Develop
 
+Use Node.js 22 and npm.
+
 ```sh
 npm install
-npm run dev          # opens the Electron dev window with HMR
+npm run dev
 npm run typecheck
 npm run lint
+npm run build
 ```
 
-## Build & package
+Set the catalog URL in `.env`:
 
 ```sh
-npm run icons        # regenerate build/icon.{png,icns,ico} from logo.svg
-npm run build        # type-check + compile main / preload / renderer
-
-npm run build:unpack # quick local pack (no installer)
-npm run build:mac    # DMG + ZIP, universal (arm64 + x64)
-npm run build:win    # NSIS installer, x64
-npm run build:linux  # AppImage + deb
+MAIN_VITE_MANIFEST_URL=https://your-host/reciters.json
 ```
 
-Local mac builds skip notarization by default (the YAML's `mac.notarize: false`); CI overrides it on tag pushes. To force a notarized local build, run:
+Copy `.env.example` as a starting point. Do not commit `.env`.
+
+## Build And Package
 
 ```sh
-npx electron-builder --mac --arm64 -c.mac.notarize=true
+npm run icons        # regenerate platform icons from logo.svg
+npm run build        # type-check and compile main, preload, and renderer
+npm run build:unpack # create an unpacked local application
+npm run build:win    # Windows NSIS installer, x64
+npm run build:mac    # macOS DMG + ZIP, arm64
+npm run build:linux  # Linux AppImage + deb
 ```
 
-…with `CSC_LINK`, `CSC_KEY_PASSWORD`, `APPLE_ID`, `APPLE_APP_SPECIFIC_PASSWORD`, and `APPLE_TEAM_ID` set in your env.
+macOS local builds skip notarization. CI enables notarization for tagged releases. Windows
+builds are unsigned unless signing credentials are provided.
 
-> **Mac is arm64-only for v1.** Universal binaries don't merge cleanly with `better-sqlite3`'s native module out of the box. Intel (x64) Mac support is a future addition — adding a second arch needs either a `beforePack` hook swapping pre-staged binaries (single-runner approach) or a second mac job with `latest-mac.yml` merge handling.
+## Release Flow
 
-## Release flow
+1. Bump the version in `package.json`.
+2. Run `npm run typecheck`, `npm run lint`, `npm run build`, and `npm run build:unpack`.
+3. Exercise the release smoke matrix in [MOBILE_PARITY_IMPLEMENTATION_PLAN.md](./MOBILE_PARITY_IMPLEMENTATION_PLAN.md).
+4. Push a `v*` tag.
+5. Verify the draft GitHub Release artifacts before publishing it.
 
-Push a `v*` tag and the [Release workflow](.github/workflows/release.yml) builds for every OS in the matrix and uploads installers + `latest*.yml` to a GitHub Release:
+The release workflow builds macOS arm64, Windows x64, and Linux packages. Published releases
+are consumed by `electron-updater`.
 
-```sh
-# bump version in package.json first
-git tag v0.2.0
-git push --tags
-```
+Required release secrets:
 
-The Release lands as a **draft** — verify the artifacts before promoting it; once published, existing installs pick it up via `electron-updater` (checks on launch + every 6h).
+- `MAIN_VITE_MANIFEST_URL`
+- `MAC_CERT_BASE64`, `MAC_CERT_PASSWORD`, `APPLE_ID`, `APPLE_APP_SPECIFIC_PASSWORD`, and
+  `APPLE_TEAM_ID` for signed/notarized macOS releases
+- `WIN_CSC_LINK` and `WIN_CSC_KEY_PASSWORD` when Windows signing is enabled
 
-### Required GitHub Secrets
+## Architecture
 
-| Secret                        | When                                      | What                                                              |
-| ----------------------------- | ----------------------------------------- | ----------------------------------------------------------------- |
-| `GITHUB_TOKEN`                | always                                    | Provided automatically by Actions                                 |
-| `MAC_CERT_BASE64`             | mac signing                               | base64-encoded Developer ID Application `.p12`                    |
-| `MAC_CERT_PASSWORD`           | mac signing                               | Password for the `.p12`                                           |
-| `APPLE_ID`                    | notarization                              | Apple ID email                                                    |
-| `APPLE_APP_SPECIFIC_PASSWORD` | notarization                              | App-specific password ([create here](https://appleid.apple.com/)) |
-| `APPLE_TEAM_ID`               | notarization                              | 10-char team id from developer.apple.com                          |
-| `WIN_CSC_LINK`                | win signing (optional, v1 ships unsigned) | base64-encoded `.pfx` cert                                        |
-| `WIN_CSC_KEY_PASSWORD`        | win signing                               | Password for the `.pfx`                                           |
-
-## Project layout
-
-```
+```text
 src/
-├── main/        # Electron main process (lifecycle, IPC, DB, downloader, updater)
-├── preload/     # Context-isolated bridge exposing window.api
-├── renderer/    # React UI (Vite-served in dev, file:// in prod)
-└── shared/      # IPC types + bundled surahs.json (no Node or DOM imports)
-
-scripts/
-└── build-icons.mjs  # regenerates platform icons from logo.svg
-
-.github/workflows/
-├── ci.yml       # typecheck + lint + build on push / PR
-└── release.yml  # matrix package + publish on tag push
+  main/       Electron lifecycle, SQLite, downloads, protocols, diagnostics, updates
+  preload/    Context-isolated typed bridge exposed as globalThis.api
+  renderer/   React routes, components, Zustand stores, and the audio engine
+  shared/     IPC types/constants and bundled surah metadata
 ```
 
-Path aliases (configured in `electron.vite.config.ts` and both tsconfigs):
+- SQLite is the source of truth for downloads and the persistent queue.
+- The filesystem is reconciled into SQLite at startup and through Refresh Library.
+- Downloaded audio and cached photos are served through the controlled `app://` protocol.
+- The main process owns structured diagnostics, native save dialogs, and automatic updates.
+- The renderer owns presentation and one hidden `<audio>` element.
 
-- `@shared/*` → `src/shared/*`
-- `@renderer/*` → `src/renderer/src/*`
+## Diagnostics
 
-## Environment
-
-`.env` keys (copy from `.env.example`):
-
-- `MAIN_VITE_MANIFEST_URL` — full URL to `reciters.json` on R2 (main process fetches this)
-- `VITE_R2_HOST` — R2 host reserved for the renderer (kept for future CSP tightening)
-
-The auto-updater publish target is hard-coded to `ebeeraheem/qurandesk-electron` in `electron-builder.yml`.
+Settings > Support > Export diagnostics opens a native save dialog for a JSON report containing
+app/catalog/settings state, aggregate download/storage/update state, and recent sanitized
+errors. The exporter redacts URLs, credentials, secrets, and local paths and bounds retained
+diagnostic size.

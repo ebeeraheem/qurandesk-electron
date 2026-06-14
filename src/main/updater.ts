@@ -65,7 +65,7 @@ export function initUpdater(): void {
   })
   autoUpdater.on('error', (e) => {
     recordDiagnostic('updater/event', e)
-    emit({ status: 'error', message: e?.message ?? String(e) })
+    emit({ status: 'error' })
   })
 
   // Kick off the first check + interval. We don't await — the events drive the UI.
@@ -83,10 +83,7 @@ export async function checkForUpdates(): Promise<UpdateStatus> {
     return lastStatus
   } catch (e) {
     recordDiagnostic('updater/check', e)
-    const status: UpdateStatus = {
-      status: 'error',
-      message: e instanceof Error ? e.message : String(e)
-    }
+    const status: UpdateStatus = { status: 'error' }
     emit(status)
     return status
   }

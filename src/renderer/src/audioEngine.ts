@@ -295,10 +295,6 @@ export function togglePlay(): void {
   }
 }
 
-export function pause(): void {
-  audioEl?.pause()
-}
-
 function prepareCurrentForDeletion(matches: (track: CurrentTrack) => boolean): void {
   const { current } = usePlayerStore.getState()
   if (!current || !matches(current)) return

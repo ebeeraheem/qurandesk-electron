@@ -23,6 +23,7 @@ export default function Settings(): React.JSX.Element {
   const [appInfo, setAppInfo] = useState<AppInfo | null>(null)
   const [cachedAt, setCachedAt] = useState<number | null>(null)
   const [refreshing, setRefreshing] = useState(false)
+  const [refreshFailed, setRefreshFailed] = useState(false)
   const [deleteAllOpen, setDeleteAllOpen] = useState(false)
   const [exportingDiagnostics, setExportingDiagnostics] = useState(false)
   const [diagnosticsSaved, setDiagnosticsSaved] = useState(false)
@@ -38,15 +39,22 @@ export default function Settings(): React.JSX.Element {
       .then(setAppInfo)
       .catch(() => undefined)
     // eslint-disable-next-line react-hooks/set-state-in-effect
-    void loadManifestStatus()
-    return globalThis.api.on('manifest:updated', () => void loadManifestStatus())
+    void loadManifestStatus().catch(() => undefined)
+    return globalThis.api.on(
+      'manifest:updated',
+      () => void loadManifestStatus().catch(() => undefined)
+    )
   }, [])
 
   const onRefresh = async (): Promise<void> => {
     setRefreshing(true)
+    setRefreshFailed(false)
     try {
-      await globalThis.api.refreshManifest()
+      const result = await globalThis.api.refreshManifest()
+      setRefreshFailed(!result.ok)
       await loadManifestStatus()
+    } catch {
+      setRefreshFailed(true)
     } finally {
       setRefreshing(false)
     }
@@ -124,9 +132,11 @@ export default function Settings(): React.JSX.Element {
         <Row
           label="Catalog"
           sub={
-            cachedAt
-              ? `Last updated ${formatRelativeTime(cachedAt)}.`
-              : 'Catalog has never been fetched.'
+            refreshFailed
+              ? 'Could not refresh the catalog. Please try again.'
+              : cachedAt
+                ? `Last updated ${formatRelativeTime(cachedAt)}.`
+                : 'Catalog has never been fetched.'
           }
           control={
             <button

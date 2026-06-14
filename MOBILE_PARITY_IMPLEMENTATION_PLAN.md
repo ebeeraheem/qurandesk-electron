@@ -536,6 +536,8 @@ interrupt the user when a restart can install a ready update.
 
 ## Phase 9 - Final Mobile-Parity Polish And Release Validation
 
+**Status:** Implemented
+
 ### Outcome
 
 The complete desktop experience is internally consistent, obsolete code is removed, and the

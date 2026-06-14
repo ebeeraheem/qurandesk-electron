@@ -78,7 +78,14 @@ export default function ConfirmationDialog({
     try {
       await onConfirm()
       onClose()
-    } catch {
+    } catch (error) {
+      void globalThis.api
+        .reportDiagnostic(
+          'renderer/confirmation',
+          error instanceof Error ? (error.stack ?? error.message) : String(error),
+          { title }
+        )
+        .catch(() => undefined)
       setError("Couldn't delete this right now. Please try again.")
       setBusy(false)
       busyRef.current = false

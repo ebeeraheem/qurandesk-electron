@@ -143,10 +143,8 @@ async function buildDiagnosticsReport(): Promise<unknown> {
 
 function registerIpcHandlers(): void {
   // Bootstrap.
-  ipcMain.handle(IPC.ping, async () => 'pong' as const)
   ipcMain.handle(IPC.getAppInfo, async () => ({
-    version: app.getVersion(),
-    platform: process.platform
+    version: app.getVersion()
   }))
 
   // Audio protocol.

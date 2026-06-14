@@ -7,7 +7,10 @@ export default function UpdateBanner(): React.JSX.Element | null {
   if (status.status !== 'ready') return null
 
   return (
-    <div className="flex items-center justify-center bg-success/15 px-4 py-2 text-xs text-success">
+    <div
+      role="status"
+      className="flex items-center justify-center bg-success/15 px-4 py-2 text-xs text-success"
+    >
       <span className="font-semibold">Update {status.version} is ready.</span>
       <button
         onClick={() => globalThis.api.installUpdateOnQuit()}

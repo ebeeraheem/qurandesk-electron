@@ -24,7 +24,7 @@ asarUnpack:
 npmRebuild: false
 
 # ---------------------------------------------------------------------------
-# macOS — universal (arm64 + x64), hardened runtime, ready for notarization
+# macOS — arm64, hardened runtime, ready for notarization
 # ---------------------------------------------------------------------------
 mac:
   category: public.app-category.music
@@ -38,9 +38,6 @@ mac:
   # account. CI overrides via `-c.mac.notarize=true` and passes APPLE_*
   # env vars from secrets when producing a release.
   notarize: false
-  extendInfo:
-    - NSDocumentsFolderUsageDescription: QuranDesk needs access to manage downloaded recitations.
-
 dmg:
   artifactName: ${name}-${version}.${ext}
 

@@ -5,7 +5,6 @@ export type ReciterSummary = {
   id: string
   name: string
   photoUrl: string | null
-  style?: string
   totalSizeBytes?: number
   downloadState: 'none' | 'partial' | 'complete'
   downloadedSurahs: number // 0..114
@@ -54,7 +53,7 @@ export type UpdateStatus =
   | { status: 'available'; version: string }
   | { status: 'downloading'; percent: number }
   | { status: 'ready'; version: string }
-  | { status: 'error'; message: string }
+  | { status: 'error' }
 
 /**
  * Stable identifiers for every error class the main process can surface. The
@@ -77,15 +76,12 @@ export type AppErrorCode =
 export type AppError = {
   code: AppErrorCode
   userMessage: string
-  /** Technical context for the log file; never rendered to the user. */
-  detail?: string
 }
 
 export type StorageUsage = {
   appUsedBytes: number
   totalBytes: number
   freeBytes: number
-  downloadDir: string
 }
 
 /**
@@ -98,7 +94,6 @@ export type QueueEntry = {
   status: 'queued' | 'active' | 'failed'
   progressBytes: number
   totalBytes: number
-  error: string | null
   createdAt: number
 }
 
@@ -113,15 +108,12 @@ export type ExportDiagnosticsResult = {
 
 export type AppInfo = {
   version: string
-  platform: NodeJS.Platform
 }
 
 export interface QuranDeskAPI {
   // Bootstrap / diagnostics
   getAppInfo: () => Promise<AppInfo>
-  ping: () => Promise<'pong'>
-
-  // Catalog (stubs for later phases)
+  // Catalog
   getReciters: () => Promise<ReciterSummary[]>
   refreshManifest: () => Promise<{ ok: boolean; updatedAt?: string; error?: AppError }>
   getManifestStatus: () => Promise<{
@@ -186,8 +178,6 @@ export const EVENTS = {
 // Channel names used over `ipcRenderer.invoke`. Listed once so main + preload + tests stay in sync.
 export const IPC = {
   getAppInfo: 'app:getAppInfo',
-  ping: 'app:ping',
-
   getReciters: 'catalog:getReciters',
   refreshManifest: 'catalog:refreshManifest',
   getManifestStatus: 'catalog:getManifestStatus',

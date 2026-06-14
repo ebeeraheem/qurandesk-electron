@@ -5,8 +5,8 @@ import { recordDiagnostic } from './diagnostics'
 /**
  * Build an `AppError` and log it. Every user-facing error in the main process
  * should flow through here so the log file accumulates the technical detail
- * (the `userMessage` is what the renderer shows; `detail` is what we read when
- * triaging a bug report).
+ * The renderer receives only `userMessage`; technical detail stays in logs and
+ * the privacy-safe diagnostics buffer.
  */
 export function appError(code: AppErrorCode, userMessage: string, detail?: unknown): AppError {
   const detailStr =
@@ -17,7 +17,7 @@ export function appError(code: AppErrorCode, userMessage: string, detail?: unkno
         : undefined
   log.error(`[${code}] ${userMessage}${detailStr ? `\n  detail: ${detailStr}` : ''}`)
   recordDiagnostic(code, detail ?? userMessage, { userMessage })
-  return detailStr ? { code, userMessage, detail: detailStr } : { code, userMessage }
+  return { code, userMessage }
 }
 
 /**

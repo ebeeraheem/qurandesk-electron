@@ -93,19 +93,14 @@ export function getCompletedDownloads(): SurahDownload[] {
 export function getReciterStats(reciterId: string): {
   downloadedSurahs: number
   downloadState: ReciterSummary['downloadState']
-  bytesOnDisk: number
 } {
   const row = getDb()
-    .prepare(
-      `SELECT COUNT(*) AS count, COALESCE(SUM(size_bytes), 0) AS bytes
-       FROM downloads WHERE reciter_id = ?`
-    )
-    .get(reciterId) as { count: number; bytes: number }
+    .prepare('SELECT COUNT(*) AS count FROM downloads WHERE reciter_id = ?')
+    .get(reciterId) as { count: number }
   const count = row.count
   return {
     downloadedSurahs: count,
-    downloadState: count === 0 ? 'none' : count >= 114 ? 'complete' : 'partial',
-    bytesOnDisk: row.bytes
+    downloadState: count === 0 ? 'none' : count >= 114 ? 'complete' : 'partial'
   }
 }
 
@@ -116,7 +111,6 @@ export function buildReciterSummary(r: RemoteReciter): ReciterSummary {
     id: r.id,
     name: r.name,
     photoUrl: r.photo_url ?? null,
-    style: r.style,
     totalSizeBytes: r.total_size_bytes,
     downloadedSurahs: stats.downloadedSurahs,
     downloadState: stats.downloadState

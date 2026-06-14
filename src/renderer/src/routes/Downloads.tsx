@@ -14,19 +14,34 @@ export default function Downloads(): React.JSX.Element {
   const refreshing = useDownloadsStore((s) => s.refreshing)
   const [reciters, setReciters] = useState<ReciterSummary[]>([])
   const [usage, setUsage] = useState<StorageUsage | null>(null)
+  const [refreshFailed, setRefreshFailed] = useState(false)
 
   const reload = async (): Promise<void> => {
-    const [list, u] = await Promise.all([
-      globalThis.api.getReciters(),
-      globalThis.api.getStorageUsage().catch(() => null)
-    ])
-    setReciters(list)
-    setUsage(u)
+    try {
+      const [list, u] = await Promise.all([
+        globalThis.api.getReciters(),
+        globalThis.api.getStorageUsage().catch(() => null)
+      ])
+      setReciters(list)
+      setUsage(u)
+    } catch (error) {
+      void globalThis.api
+        .reportDiagnostic(
+          'renderer/downloads-reload',
+          error instanceof Error ? (error.stack ?? error.message) : String(error)
+        )
+        .catch(() => undefined)
+    }
   }
 
   const refresh = async (): Promise<void> => {
-    await refreshLibraryState()
-    await reload()
+    setRefreshFailed(false)
+    try {
+      await refreshLibraryState()
+      await reload()
+    } catch {
+      setRefreshFailed(true)
+    }
   }
 
   useEffect(() => {
@@ -92,6 +107,12 @@ export default function Downloads(): React.JSX.Element {
           {refreshing ? 'Refreshing...' : 'Refresh library'}
         </button>
       </header>
+
+      {refreshFailed && (
+        <div role="alert" className="rounded-xl bg-danger/10 px-4 py-3 text-sm text-danger">
+          Could not refresh the library. Please try again.
+        </div>
+      )}
 
       {activeEntries.length === 0 &&
         failedEntries.length === 0 &&
@@ -227,6 +248,11 @@ function ActiveReciterCard({
             <div
               className="h-full rounded-full bg-primary transition-all"
               style={{ width: `${overallPct}%` }}
+              role="progressbar"
+              aria-label={`${name} download progress`}
+              aria-valuemin={0}
+              aria-valuemax={100}
+              aria-valuenow={Math.round(overallPct)}
             />
           </div>
 

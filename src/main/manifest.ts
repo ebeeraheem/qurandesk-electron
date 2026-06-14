@@ -23,7 +23,6 @@ export type RemoteReciter = {
   name: string
   photo_url?: string
   total_size_bytes?: number
-  style?: string
 }
 
 export type RemoteManifest = {
@@ -119,8 +118,7 @@ function validate(payload: unknown): RemoteManifest {
       total_size_bytes:
         typeof r.total_size_bytes === 'number' && Number.isFinite(r.total_size_bytes)
           ? r.total_size_bytes
-          : undefined,
-      style: typeof r.style === 'string' ? r.style : undefined
+          : undefined
     })
   }
 
@@ -202,7 +200,7 @@ export async function refresh(): Promise<
     // serializes cleanly. Anything else (network / JSON parse) is wrapped as a
     // generic fetch-failed.
     lastError = isAppError(e)
-      ? { code: e.code, userMessage: e.userMessage, ...(e.detail ? { detail: e.detail } : {}) }
+      ? { code: e.code, userMessage: e.userMessage }
       : appError(
           'manifest/fetch-failed',
           "Couldn't reach the catalog. Check your internet connection and try again.",

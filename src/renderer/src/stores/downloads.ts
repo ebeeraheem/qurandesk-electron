@@ -65,7 +65,6 @@ function applyProgress(p: SurahDownload): void {
         status: p.status,
         progressBytes: p.progressBytes ?? 0,
         totalBytes: p.totalBytes ?? 0,
-        error: null,
         // Preserve original createdAt so ordering is stable; default to now if new.
         createdAt: i >= 0 ? queue[i].createdAt : Date.now()
       }

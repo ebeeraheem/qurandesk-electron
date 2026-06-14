@@ -361,7 +361,6 @@ function rowToEntry(r: QueueRow): QueueEntry {
     status: r.status,
     progressBytes: r.progress_bytes,
     totalBytes: r.total_bytes,
-    error: r.error,
     createdAt: r.created_at
   }
 }

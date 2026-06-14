@@ -121,6 +121,8 @@ function BulkDownloadAction({
   surahsRemaining: number
   onDownload: () => Promise<void>
 }>): React.JSX.Element | null {
+  const [failed, setFailed] = useState(false)
+
   if (downloadedCount >= 114) return null
   if (surahsRemaining === 0) {
     return (
@@ -135,11 +137,21 @@ function BulkDownloadAction({
       ? `Download remaining ${surahsRemaining}`
       : 'Download all 114'
   return (
-    <button
-      onClick={() => void onDownload()}
-      className="rounded-full bg-primary px-5 py-2 text-xs font-semibold text-white shadow-sm hover:opacity-90"
-    >
-      {label}
-    </button>
+    <div className="text-right">
+      <button
+        onClick={() => {
+          setFailed(false)
+          void onDownload().catch(() => setFailed(true))
+        }}
+        className="rounded-full bg-primary px-5 py-2 text-xs font-semibold text-white shadow-sm hover:opacity-90"
+      >
+        {label}
+      </button>
+      {failed && (
+        <div role="alert" className="mt-2 text-xs text-danger">
+          Could not start the downloads. Please try again.
+        </div>
+      )}
+    </div>
   )
 }
