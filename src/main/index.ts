@@ -133,7 +133,7 @@ function registerIpcHandlers(): void {
   })
   ipcMain.handle(IPC.getManifestStatus, async () => {
     const s = manifest.getStatus()
-    return { cachedAt: s.cachedAt, lastError: s.lastError }
+    return { cachedAt: s.cachedAt, lastError: s.lastError, fetching: s.fetching }
   })
   ipcMain.handle(IPC.getSurahDownloads, async (_e, reciterId: unknown) => {
     return getSurahDownloads(validateReciterId(reciterId))

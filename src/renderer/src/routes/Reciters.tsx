@@ -2,35 +2,37 @@ import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import type { AppError, ReciterSummary } from '@shared/api'
 import ReciterCard from '../components/ReciterCard'
-import { formatRelativeTime } from '../utils/format'
 
 export default function Reciters(): React.JSX.Element {
   const navigate = useNavigate()
   const [reciters, setReciters] = useState<ReciterSummary[]>([])
-  const [status, setStatus] = useState<{ cachedAt: number | null; lastError: AppError | null }>({
-    cachedAt: null,
-    lastError: null
-  })
+  const [status, setStatus] = useState<{
+    lastError: AppError | null
+    fetching: boolean
+  }>({ lastError: null, fetching: false })
   const [query, setQuery] = useState('')
   const [loaded, setLoaded] = useState(false)
 
   const reload = async (): Promise<void> => {
-    const [list, s] = await Promise.all([
+    const [list, status] = await Promise.all([
       globalThis.api.getReciters(),
       globalThis.api.getManifestStatus()
     ])
-    setReciters(list)
-    setStatus(s)
+    setReciters(list.sort((a, b) => a.name.localeCompare(b.name)))
+    setStatus({ lastError: status.lastError, fetching: status.fetching })
     setLoaded(true)
   }
 
+  const refresh = async (): Promise<void> => {
+    await globalThis.api.refreshManifest()
+    await reload()
+  }
+
   useEffect(() => {
-    // Fetch-on-mount + subscribe-to-events. Two separate concerns sharing one
-    // effect; both genuinely belong here.
+    // Cached catalog renders immediately; refresh continues in the background.
     // eslint-disable-next-line react-hooks/set-state-in-effect
     void reload()
     const off1 = globalThis.api.on('manifest:updated', () => void reload())
-    // Re-fetch reciter list when a download completes so badge counts stay live.
     const off2 = globalThis.api.on('download:completed', () => void reload())
     const off3 = globalThis.api.on('library:changed', () => void reload())
     return () => {
@@ -43,29 +45,22 @@ export default function Reciters(): React.JSX.Element {
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase()
     if (!q) return reciters
-    return reciters.filter((r) => {
-      return r.name.toLowerCase().includes(q) || (r.style?.toLowerCase().includes(q) ?? false)
-    })
+    return reciters.filter((reciter) => reciter.name.toLowerCase().includes(q))
   }, [reciters, query])
 
   return (
     <div className="px-10 py-8">
       <header className="app-drag flex flex-wrap items-end justify-between gap-6 pb-6">
-        <div>
-          <h1 className="text-3xl font-bold">Reciters</h1>
-          <p className="mt-1 text-sm text-muted">
-            {reciters.length} reciter{reciters.length === 1 ? '' : 's'}
-            {status.cachedAt != null && ` · updated ${formatRelativeTime(status.cachedAt)}`}
-          </p>
-        </div>
+        <h1 className="text-3xl font-bold">Reciters</h1>
         <div className="app-no-drag">
           <SearchInput value={query} onChange={setQuery} />
         </div>
       </header>
 
-      {/* Empty / error states */}
-      {loaded && reciters.length === 0 && (
-        <EmptyOrError lastError={status.lastError} onRetry={() => void reload()} />
+      {(!loaded || (reciters.length === 0 && status.fetching)) && <CatalogLoading />}
+
+      {loaded && reciters.length === 0 && !status.fetching && (
+        <EmptyOrError lastError={status.lastError} onRetry={() => void refresh()} />
       )}
 
       {reciters.length > 0 && filtered.length === 0 && (
@@ -76,13 +71,22 @@ export default function Reciters(): React.JSX.Element {
 
       {filtered.length > 0 && (
         <ul className="grid grid-cols-[repeat(auto-fill,minmax(220px,1fr))] gap-x-5 gap-y-7">
-          {filtered.map((r) => (
-            <li key={r.id}>
-              <ReciterCard reciter={r} onClick={() => navigate(`/reciter/${r.id}`)} />
+          {filtered.map((reciter) => (
+            <li key={reciter.id}>
+              <ReciterCard reciter={reciter} onClick={() => navigate(`/reciter/${reciter.id}`)} />
             </li>
           ))}
         </ul>
       )}
+    </div>
+  )
+}
+
+function CatalogLoading(): React.JSX.Element {
+  return (
+    <div className="grid place-items-center rounded-xl border border-border bg-bg-elev px-6 py-16">
+      <div className="size-8 animate-spin rounded-full border-2 border-bg border-t-primary" />
+      <div className="mt-3 text-sm text-muted">Loading reciters...</div>
     </div>
   )
 }
@@ -92,7 +96,7 @@ function SearchInput({
   onChange
 }: Readonly<{
   value: string
-  onChange: (v: string) => void
+  onChange: (value: string) => void
 }>): React.JSX.Element {
   return (
     <label className="flex w-72 items-center gap-2 rounded-full border border-border bg-bg-elev px-4 py-2 text-sm focus-within:border-primary">
@@ -108,8 +112,8 @@ function SearchInput({
       </svg>
       <input
         value={value}
-        onChange={(e) => onChange(e.target.value)}
-        placeholder="Search reciters…"
+        onChange={(event) => onChange(event.target.value)}
+        placeholder="Search reciters..."
         className="flex-1 bg-transparent text-fg placeholder:text-muted focus:outline-none"
       />
       {value && (
@@ -142,9 +146,11 @@ function EmptyOrError({
 }>): React.JSX.Element {
   return (
     <div className="grid place-items-center rounded-xl border border-border bg-bg-elev px-6 py-16 text-center">
-      <div className="text-sm font-semibold text-fg">Couldn&apos;t load the catalog</div>
+      <div className="text-sm font-semibold text-fg">
+        {lastError ? "Couldn't load the catalog" : 'No reciters available'}
+      </div>
       <p className="mt-2 max-w-sm text-sm text-muted">
-        {lastError?.userMessage ?? 'No catalog available.'}
+        {lastError?.userMessage ?? 'Refresh the catalog to check again.'}
       </p>
       <button
         onClick={onRetry}

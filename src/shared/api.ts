@@ -122,7 +122,11 @@ export interface QuranDeskAPI {
   // Catalog (stubs for later phases)
   getReciters: () => Promise<ReciterSummary[]>
   refreshManifest: () => Promise<{ ok: boolean; updatedAt?: string; error?: AppError }>
-  getManifestStatus: () => Promise<{ cachedAt: number | null; lastError: AppError | null }>
+  getManifestStatus: () => Promise<{
+    cachedAt: number | null
+    lastError: AppError | null
+    fetching: boolean
+  }>
 
   // Surah-level
   getSurahDownloads: (reciterId: string) => Promise<SurahDownload[]>

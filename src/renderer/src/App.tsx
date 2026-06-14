@@ -1,4 +1,3 @@
-import { useEffect, useState } from 'react'
 import { Navigate, Route, Routes, useLocation } from 'react-router-dom'
 import Sidebar from './components/Sidebar'
 import PlayerBar from './components/PlayerBar'
@@ -7,31 +6,11 @@ import Reciters from './routes/Reciters'
 import ReciterDetail from './routes/ReciterDetail'
 import Downloads from './routes/Downloads'
 import Settings from './routes/Settings'
-import Welcome from './routes/Welcome'
 import NowPlaying from './routes/NowPlaying'
 import UpdateBanner from './components/UpdateBanner'
 import Toaster from './components/Toaster'
 
-type Gate = { kind: 'checking' } | { kind: 'welcome' } | { kind: 'app' }
-
 export default function App(): React.JSX.Element {
-  const [gate, setGate] = useState<Gate>({ kind: 'checking' })
-
-  useEffect(() => {
-    globalThis.api
-      .getManifestStatus()
-      .then((s: { cachedAt: null }) => setGate({ kind: s.cachedAt === null ? 'welcome' : 'app' }))
-      .catch(() => setGate({ kind: 'welcome' }))
-  }, [])
-
-  if (gate.kind === 'checking') {
-    return <div className="h-full w-full bg-bg" />
-  }
-
-  if (gate.kind === 'welcome') {
-    return <Welcome onContinue={() => setGate({ kind: 'app' })} />
-  }
-
   return (
     <div className="flex h-full w-full flex-col bg-bg text-fg">
       <UpdateBanner />

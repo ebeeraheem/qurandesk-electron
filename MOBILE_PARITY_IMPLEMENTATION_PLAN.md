@@ -301,6 +301,8 @@ surah, one reciter, or the entire downloaded library.
 
 ## Phase 5 - Bring Catalog And Reciter Detail To Mobile Parity
 
+**Status:** Implemented
+
 ### Outcome
 
 Reciters and reciter detail use the mobile app's simpler status language and remove desktop-only
