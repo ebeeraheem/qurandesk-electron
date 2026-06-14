@@ -7,6 +7,7 @@ import { refreshLibraryState, useDownloadsStore } from '../stores/downloads'
 import { formatBytes } from '../utils/format'
 import ConfirmationDialog from '../components/ConfirmationDialog'
 import { prepareReciterForDeletion } from '../audioEngine'
+import { reciterStatusLabel } from '../utils/reciterStatus'
 
 export default function Downloads(): React.JSX.Element {
   const queue = useDownloadsStore((s) => s.queue)
@@ -21,6 +22,11 @@ export default function Downloads(): React.JSX.Element {
     ])
     setReciters(list)
     setUsage(u)
+  }
+
+  const refresh = async (): Promise<void> => {
+    await refreshLibraryState()
+    await reload()
   }
 
   useEffect(() => {
@@ -44,24 +50,21 @@ export default function Downloads(): React.JSX.Element {
     return m
   }, [reciters])
 
-  // Group queue entries by reciter; preserve insertion order.
-  const queueByReciter = useMemo(() => {
+  const activeEntries = useMemo(() => queue.filter((q) => q.status !== 'failed'), [queue])
+  const failedEntries = useMemo(() => queue.filter((q) => q.status === 'failed'), [queue])
+
+  // Group only work that can still progress; preserve insertion order.
+  const activeByReciter = useMemo(() => {
     const m = new Map<string, QueueEntry[]>()
-    for (const q of queue) {
+    for (const q of activeEntries) {
       const list = m.get(q.reciterId) ?? []
       list.push(q)
       m.set(q.reciterId, list)
     }
     return m
-  }, [queue])
+  }, [activeEntries])
 
-  const failedEntries = queue.filter((q) => q.status === 'failed')
-  const activeOrQueuedCount = queue.filter((q) => q.status !== 'failed').length
-
-  const completedReciters = reciters.filter((r) => r.downloadState === 'complete')
-  const partialReciters = reciters.filter(
-    (r) => r.downloadState === 'partial' && !queueByReciter.has(r.id)
-  )
+  const onDeviceReciters = reciters.filter((r) => r.downloadState !== 'none')
 
   return (
     <div className="px-10 py-8">
@@ -73,8 +76,8 @@ export default function Downloads(): React.JSX.Element {
               {usage ? formatBytes(usage.appUsedBytes) : '—'}
             </span>{' '}
             used by QuranDesk
-            {activeOrQueuedCount > 0 && (
-              <span className="ml-2">· {activeOrQueuedCount} in progress</span>
+            {activeEntries.length > 0 && (
+              <span className="ml-2">· {activeEntries.length} in progress</span>
             )}
             {failedEntries.length > 0 && (
               <span className="ml-2 text-danger">· {failedEntries.length} failed</span>
@@ -83,21 +86,21 @@ export default function Downloads(): React.JSX.Element {
         </div>
         <button
           disabled={refreshing}
-          onClick={() => void refreshLibraryState().then(reload)}
+          onClick={() => void refresh()}
           className="app-no-drag rounded-full bg-bg-elev px-4 py-2 text-xs font-semibold text-muted hover:text-fg disabled:opacity-50"
         >
           {refreshing ? 'Refreshing...' : 'Refresh library'}
         </button>
       </header>
 
-      {queue.length === 0 && completedReciters.length === 0 && partialReciters.length === 0 && (
-        <EmptyState />
-      )}
+      {activeEntries.length === 0 &&
+        failedEntries.length === 0 &&
+        onDeviceReciters.length === 0 && <EmptyState />}
 
-      {queueByReciter.size > 0 && (
+      {activeByReciter.size > 0 && (
         <Section title="Downloading now">
           <div className="space-y-3">
-            {[...queueByReciter.entries()].map(([reciterId, entries]) => (
+            {[...activeByReciter.entries()].map(([reciterId, entries]) => (
               <ActiveReciterCard
                 key={reciterId}
                 reciter={reciterById.get(reciterId)}
@@ -123,21 +126,11 @@ export default function Downloads(): React.JSX.Element {
         </Section>
       )}
 
-      {completedReciters.length > 0 && (
-        <Section title="Fully downloaded">
+      {onDeviceReciters.length > 0 && (
+        <Section title="On device">
           <ul className="divide-y divide-border rounded-xl border border-border bg-bg-elev">
-            {completedReciters.map((r) => (
-              <ReciterLine key={r.id} reciter={r} badge="Complete" badgeTone="success" />
-            ))}
-          </ul>
-        </Section>
-      )}
-
-      {partialReciters.length > 0 && (
-        <Section title="Partial">
-          <ul className="divide-y divide-border rounded-xl border border-border bg-bg-elev">
-            {partialReciters.map((r) => (
-              <ReciterLine key={r.id} reciter={r} subtitle={`${r.downloadedSurahs} surahs`} />
+            {onDeviceReciters.map((r) => (
+              <ReciterLine key={r.id} reciter={r} />
             ))}
           </ul>
         </Section>
@@ -191,11 +184,10 @@ function ActiveReciterCard({
 }>): React.JSX.Element {
   const active = entries.find((e) => e.status === 'active')
   const queued = entries.filter((e) => e.status === 'queued')
-  const failed = entries.filter((e) => e.status === 'failed')
 
   // Per-reciter progress: completed-on-disk + currently-active progress ÷ total scope.
   const downloadedCount = reciter?.downloadedSurahs ?? 0
-  const totalRemaining = entries.length // queued + active + failed
+  const totalRemaining = entries.length
   const totalScope = downloadedCount + totalRemaining
   const activePct =
     active?.totalBytes && active.progressBytes
@@ -260,15 +252,14 @@ function ActiveReciterCard({
             ) : (
               <>{queued.length > 0 ? <span>{queued.length} queued</span> : <span>—</span>}</>
             )}
-            {failed.length > 0 && <span className="text-danger">· {failed.length} failed</span>}
           </div>
         </div>
 
         <button
           onClick={() => {
-            // Cancel every in-flight surah for this reciter.
+            // These entries contain only queued and active work.
             for (const e of entries) {
-              globalThis.api.cancelDownload(e.reciterId, e.surahNumber)
+              void globalThis.api.cancelDownload(e.reciterId, e.surahNumber)
             }
           }}
           aria-label="Cancel all"
@@ -333,17 +324,7 @@ function FailedRow({
   )
 }
 
-function ReciterLine({
-  reciter,
-  subtitle,
-  badge,
-  badgeTone
-}: Readonly<{
-  reciter: ReciterSummary
-  subtitle?: string
-  badge?: string
-  badgeTone?: 'success'
-}>): React.JSX.Element {
+function ReciterLine({ reciter }: Readonly<{ reciter: ReciterSummary }>): React.JSX.Element {
   const [deleteOpen, setDeleteOpen] = useState(false)
   return (
     <>
@@ -351,21 +332,8 @@ function ReciterLine({
         <ReciterAvatar reciter={reciter} className="h-10 w-10 shrink-0" />
         <Link to={`/reciter/${reciter.id}`} className="min-w-0 flex-1 hover:text-primary">
           <div className="truncate font-semibold">{reciter.name}</div>
-          <div className="text-xs text-muted">
-            {subtitle ??
-              `${reciter.downloadedSurahs} / 114 · ${formatBytes(reciter.totalSizeBytes)}`}
-          </div>
+          <div className="text-xs text-muted">{reciterStatusLabel(reciter)}</div>
         </Link>
-        {badge && (
-          <span
-            className={[
-              'rounded-full px-2.5 py-1 text-[11px] font-semibold',
-              badgeTone === 'success' ? 'bg-success/15 text-success' : 'bg-bg-tint text-primary'
-            ].join(' ')}
-          >
-            {badge}
-          </span>
-        )}
         <button
           onClick={() => setDeleteOpen(true)}
           title="Delete all downloaded surahs for this reciter"

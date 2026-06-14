@@ -359,6 +359,8 @@ metadata and confirmation surfaces.
 
 ## Phase 6 - Bring The Downloads Page To Mobile Parity
 
+**Status:** Implemented
+
 ### Outcome
 
 Downloads becomes a simpler operational view with active work, failures, and all on-device
