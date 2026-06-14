@@ -75,8 +75,6 @@ type QueueRow = {
   priority: number
 }
 
-const SURAH_FILE_RX = /^(\d{3})\.mp3$/
-
 // ---------------------------------------------------------------------------
 // Event API
 // ---------------------------------------------------------------------------
@@ -781,22 +779,3 @@ function isAbort(e: unknown): boolean {
     (e instanceof Error && e.name === 'AbortError')
   )
 }
-
-// ---------------------------------------------------------------------------
-// Filesystem reconciliation (called from downloads.ts buildReciterSummary)
-// ---------------------------------------------------------------------------
-
-/** True if a finalised file exists for this surah on disk. */
-export function existsOnDisk(reciterId: string, surah: number): boolean {
-  const final = audioFilePath(reciterId, surah)
-  if (!final) return false
-  try {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    require('node:fs').statSync(final)
-    return true
-  } catch {
-    return false
-  }
-}
-
-export { SURAH_FILE_RX }

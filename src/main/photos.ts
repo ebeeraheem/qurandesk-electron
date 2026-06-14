@@ -30,10 +30,6 @@ let photoRoot = ''
 /** Dedupes concurrent downloads of the same file. */
 const inflight = new Map<string, Promise<boolean>>()
 
-export function getPhotoRoot(): string {
-  return photoRoot
-}
-
 /** Compute + ensure the photos dir. Call after `app` is ready. */
 export async function initPhotoRoot(): Promise<string> {
   photoRoot = resolvePath(join(app.getPath('userData'), 'photos'))
