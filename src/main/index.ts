@@ -8,7 +8,6 @@ import { EVENTS, IPC } from '../shared/api'
 import {
   audioFileIfExists,
   audioUrl,
-  getAudioRoot,
   initAudioRoot,
   registerHandler as registerProtocolHandler,
   registerScheme as registerProtocolScheme
@@ -147,9 +146,7 @@ function registerIpcHandlers(): void {
   ipcMain.handle(IPC.ping, async () => 'pong' as const)
   ipcMain.handle(IPC.getAppInfo, async () => ({
     version: app.getVersion(),
-    platform: process.platform,
-    userDataPath: app.getPath('userData'),
-    audioDir: getAudioRoot()
+    platform: process.platform
   }))
 
   // Audio protocol.
@@ -225,13 +222,6 @@ function registerIpcHandlers(): void {
   ipcMain.handle(IPC.getStorageUsage, async () => {
     return getStorageUsage()
   })
-  ipcMain.handle(IPC.revealDownloadsFolder, async () => {
-    // No renderer-provided path — we always open the audio root we control.
-    // Avoids any chance of arbitrary-path opens via this IPC.
-    const dir = getAudioRoot()
-    if (dir) await shell.openPath(dir)
-  })
-
   // Settings.
   ipcMain.handle(IPC.getSettings, async () => getSettings())
   ipcMain.handle(IPC.updateSettings, async (_e, patch: Partial<Settings>) => updateSettings(patch))
@@ -241,7 +231,7 @@ function registerIpcHandlers(): void {
   ipcMain.handle(IPC.setLastPlayback, async (_e, state: LastPlayback) => setLastPlayback(state))
 
   // Auto-updater.
-  ipcMain.handle(IPC.checkForUpdates, async () => updater.checkForUpdates())
+  ipcMain.handle(IPC.getUpdateStatus, async () => updater.getLastStatus())
   ipcMain.handle(IPC.installUpdateOnQuit, async () => updater.installUpdateOnQuit())
 
   // Diagnostics.

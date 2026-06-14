@@ -477,6 +477,8 @@ from unexpected renderer failures without relying on raw log reveal or toasts.
 
 ## Phase 8 - Simplify Settings And Make Desktop Updates Quiet
 
+**Status:** Implemented
+
 ### Outcome
 
 Settings follows mobile's simpler structure, while Electron updates remain automatic and only

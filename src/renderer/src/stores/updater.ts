@@ -20,9 +20,9 @@ export function initUpdaterBridge(): void {
   globalThis.api.on('update:status', (s) => {
     useUpdaterStore.setState({ status: s })
   })
-  // Trigger an initial check; main will broadcast the resulting status.
+  // Hydrate without triggering another check; main owns the automatic schedule.
   globalThis.api
-    .checkForUpdates()
+    .getUpdateStatus()
     .then((s) => useUpdaterStore.setState({ status: s }))
     .catch(() => undefined)
 }

@@ -114,8 +114,6 @@ export type ExportDiagnosticsResult = {
 export type AppInfo = {
   version: string
   platform: NodeJS.Platform
-  userDataPath: string
-  audioDir: string
 }
 
 export interface QuranDeskAPI {
@@ -148,8 +146,6 @@ export interface QuranDeskAPI {
 
   // Storage
   getStorageUsage: () => Promise<StorageUsage>
-  /** Open the downloads folder in the OS file explorer. */
-  revealDownloadsFolder: () => Promise<void>
 
   // Settings
   getSettings: () => Promise<Settings>
@@ -160,7 +156,7 @@ export interface QuranDeskAPI {
   setLastPlayback: (state: LastPlayback) => Promise<void>
 
   // Updates
-  checkForUpdates: () => Promise<UpdateStatus>
+  getUpdateStatus: () => Promise<UpdateStatus>
   installUpdateOnQuit: () => Promise<void>
 
   // Diagnostics
@@ -209,14 +205,12 @@ export const IPC = {
   refreshLibrary: 'download:refreshLibrary',
 
   getStorageUsage: 'storage:getUsage',
-  revealDownloadsFolder: 'storage:revealFolder',
-
   getSettings: 'settings:get',
   updateSettings: 'settings:update',
   getLastPlayback: 'playback:get',
   setLastPlayback: 'playback:set',
 
-  checkForUpdates: 'updater:check',
+  getUpdateStatus: 'updater:getStatus',
   installUpdateOnQuit: 'updater:installOnQuit',
 
   exportDiagnostics: 'system:exportDiagnostics',

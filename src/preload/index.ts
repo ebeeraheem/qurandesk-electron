@@ -27,7 +27,6 @@ const api: QuranDeskAPI = {
 
   // Storage
   getStorageUsage: () => ipcRenderer.invoke(IPC.getStorageUsage),
-  revealDownloadsFolder: () => ipcRenderer.invoke(IPC.revealDownloadsFolder),
 
   // Settings + playback persistence
   getSettings: () => ipcRenderer.invoke(IPC.getSettings),
@@ -36,7 +35,7 @@ const api: QuranDeskAPI = {
   setLastPlayback: (state) => ipcRenderer.invoke(IPC.setLastPlayback, state),
 
   // Auto-updater
-  checkForUpdates: () => ipcRenderer.invoke(IPC.checkForUpdates),
+  getUpdateStatus: () => ipcRenderer.invoke(IPC.getUpdateStatus),
   installUpdateOnQuit: () => ipcRenderer.invoke(IPC.installUpdateOnQuit),
 
   // Diagnostics
