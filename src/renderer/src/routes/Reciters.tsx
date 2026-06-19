@@ -2,6 +2,14 @@ import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import type { AppError, ReciterSummary } from '@shared/api'
 import ReciterCard from '../components/ReciterCard'
+import SegmentedControl from '../components/SegmentedControl'
+
+type ReciterFilter = 'all' | 'downloaded'
+
+const FILTER_OPTIONS: Array<{ value: ReciterFilter; label: string }> = [
+  { value: 'all', label: 'All' },
+  { value: 'downloaded', label: 'Downloaded' }
+]
 
 export default function Reciters(): React.JSX.Element {
   const navigate = useNavigate()
@@ -11,6 +19,7 @@ export default function Reciters(): React.JSX.Element {
     fetching: boolean
   }>({ lastError: null, fetching: false })
   const [query, setQuery] = useState('')
+  const [filter, setFilter] = useState<ReciterFilter>('all')
   const [loaded, setLoaded] = useState(false)
 
   const reload = async (): Promise<void> => {
@@ -55,15 +64,18 @@ export default function Reciters(): React.JSX.Element {
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase()
-    if (!q) return reciters
-    return reciters.filter((reciter) => reciter.name.toLowerCase().includes(q))
-  }, [reciters, query])
+    let list = reciters
+    if (filter === 'downloaded') list = list.filter((reciter) => reciter.downloadState !== 'none')
+    if (q) list = list.filter((reciter) => reciter.name.toLowerCase().includes(q))
+    return list
+  }, [reciters, query, filter])
 
   return (
     <div className="px-10 py-8">
       <header className="app-drag flex flex-wrap items-end justify-between gap-6 pb-6">
         <h1 className="text-3xl font-bold">Reciters</h1>
-        <div className="app-no-drag">
+        <div className="app-no-drag flex items-center gap-3">
+          <SegmentedControl options={FILTER_OPTIONS} value={filter} onChange={setFilter} />
           <SearchInput value={query} onChange={setQuery} />
         </div>
       </header>
@@ -76,7 +88,13 @@ export default function Reciters(): React.JSX.Element {
 
       {reciters.length > 0 && filtered.length === 0 && (
         <div className="rounded-xl border border-border bg-bg-elev px-6 py-8 text-center text-sm text-muted">
-          No reciters match <span className="font-mono text-fg">{query}</span>.
+          {query.trim() ? (
+            <>
+              No reciters match <span className="font-mono text-fg">{query}</span>.
+            </>
+          ) : (
+            'No downloaded reciters yet — switch to All to browse.'
+          )}
         </div>
       )}
 

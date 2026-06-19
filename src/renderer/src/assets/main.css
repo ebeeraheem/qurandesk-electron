@@ -131,6 +131,16 @@ body {
   outline-offset: 2px;
 }
 
+/* Text inputs carry their own focus affordance (caret + container border, e.g.
+   the search pill's focus-within:border-primary). Chromium matches
+   `:focus-visible` on them even on a mouse click, drawing the keyboard ring as
+   an ugly rectangle inside rounded fields. Suppress it for text inputs;
+   buttons/links keep the ring. */
+input:focus-visible,
+textarea:focus-visible {
+  outline: none !important;
+}
+
 /* Scrollbar — subtle, theme-aware. */
 ::-webkit-scrollbar {
   width: 10px;
