@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react'
-import { handleEnded, maybePersist, persistNow, setAudioElement } from '../audioEngine'
+import { handleEnded, maybePersist, persistNow, setAudioElement, togglePlay } from '../audioEngine'
 import { usePlayerStore } from '../stores/player'
 
 /**
@@ -19,6 +19,35 @@ export default function AudioEngine(): React.JSX.Element {
     const onUnload = (): void => persistNow()
     window.addEventListener('beforeunload', onUnload)
     return () => window.removeEventListener('beforeunload', onUnload)
+  }, [])
+
+  // Global shortcut: Space toggles play/pause when a track is loaded.
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent): void => {
+      if (e.code !== 'Space') return
+
+      // Don't hijack typing or the native activation of focused controls
+      // (buttons, the seek slider, etc.).
+      const el = e.target as HTMLElement | null
+      const tag = el?.tagName
+      if (
+        tag === 'INPUT' ||
+        tag === 'TEXTAREA' ||
+        tag === 'SELECT' ||
+        tag === 'BUTTON' ||
+        el?.isContentEditable
+      ) {
+        return
+      }
+
+      // Only act when a track is actually loaded.
+      if (!usePlayerStore.getState().current) return
+
+      e.preventDefault() // stop the page from scrolling on Space
+      togglePlay()
+    }
+    globalThis.addEventListener('keydown', onKeyDown)
+    return () => globalThis.removeEventListener('keydown', onKeyDown)
   }, [])
 
   return (
