@@ -1,26 +1,17 @@
 name: Release
-
-# Tag-driven release: push a `v*` tag (e.g. `git tag v0.2.0 && git push --tags`)
-# to build + publish for every OS in the matrix. Each runner uploads its
-# artifacts to the GitHub Release that matches the tag (created as a draft if
-# it doesn't exist yet — promote it manually once you've verified the build).
-
+# Push a `v*` tag to build for every OS, then publish a single draft release.
 on:
   push:
     tags:
       - 'v*'
 
-# The default GITHUB_TOKEN is read-only since 2023. Grant write access to
-# `contents` so the workflow can create the GitHub Release and upload assets.
 permissions:
   contents: write
 
 jobs:
   build:
-    name: Build & publish (${{ matrix.os }})
+    name: Build (${{ matrix.os }})
     strategy:
-      # Keep building other platforms even if one fails — easier to debug a
-      # single broken target than to lose all artifacts.
       fail-fast: false
       matrix:
         include:
@@ -30,65 +21,70 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
-
       - uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: npm
-
       - name: Install dependencies
         run: npm ci
-
       - name: Compile (typecheck + vite build)
         run: npm run build
         env:
           MAIN_VITE_MANIFEST_URL: ${{ secrets.MAIN_VITE_MANIFEST_URL }}
 
-      # macOS: arm64 only for v1.
-      #
-      # Universal binaries don't work cleanly with better-sqlite3's native
-      # module: `npm install` on the arm64 runner produces an arm64 .node
-      # file, electron-builder packages it into both arch temp-dirs, then
-      # `@electron/universal` refuses to merge two identical-but-not-lipo'd
-      # files. Intel (x64) Mac support deferred until there is real demand
-      # (Apple Silicon is ~70% of the installed base and rising).
-      #
-      # Override `notarize` via the CLI so the yaml default (false, for
-      # local builds) doesn't leak into release builds.
-      - name: Package & publish (macOS arm64)
+      # --publish never: build/sign/notarize only. No race, no upload here.
+      - name: Package (macOS arm64)
         if: matrix.os == 'macos-latest'
-        run: npx electron-builder --mac --arm64 --publish always -c.mac.notarize=true
+        run: npx electron-builder --mac --arm64 --publish never -c.mac.notarize=true
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          # Developer ID Application cert exported as base64-encoded .p12
           CSC_LINK: ${{ secrets.MAC_CERT_BASE64 }}
           CSC_KEY_PASSWORD: ${{ secrets.MAC_CERT_PASSWORD }}
-          # notarytool credentials
           APPLE_ID: ${{ secrets.APPLE_ID }}
           APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
 
-      # Windows: v1 ships unsigned. When you add a cert later, set
-      # WIN_CSC_LINK / WIN_CSC_KEY_PASSWORD secrets and electron-builder
-      # picks them up automatically.
-      - name: Package & publish (Windows)
+      - name: Package (Windows)
         if: matrix.os == 'windows-latest'
-        run: npx electron-builder --win --publish always
+        run: npx electron-builder --win --publish never
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           WIN_CSC_LINK: ${{ secrets.WIN_CSC_LINK }}
           WIN_CSC_KEY_PASSWORD: ${{ secrets.WIN_CSC_KEY_PASSWORD }}
 
-      - name: Package & publish (Linux)
+      - name: Package (Linux)
         if: matrix.os == 'ubuntu-latest'
-        run: npx electron-builder --linux --publish always
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: npx electron-builder --linux --publish never
 
-      # Linux AppImage artifacts aren't always correctly marked executable by
-      # electron-builder, so set that explicitly in a follow-up step.
-      # This is needed for them to run at all and for auto-updates to work
-      # (AppImageUpdate uses the AppImageUpdate-zsyncmake helper, which needs to execute the AppImage to extract the embedded zsync data).
-      - name: Mark Linux AppImage executable
-        if: matrix.os == 'ubuntu-latest'
-        run: chmod +x dist/*.AppImage
+      # Upload every artifact the release needs, including the auto-updater's
+      # latest*.yml and .blockmap files. Errors loudly if a build made nothing.
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: dist-${{ matrix.os }}
+          if-no-files-found: error
+          path: |
+            dist/*.dmg
+            dist/*.zip
+            dist/*.exe
+            dist/*.AppImage
+            dist/*.deb
+            dist/*.rpm
+            dist/*.snap
+            dist/*.yml
+            dist/*.blockmap
+
+  release:
+    name: Publish draft release
+    needs: build            # waits for all three; runs once
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download all build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          merge-multiple: true
+      - name: Create / update draft release
+        uses: softprops/action-gh-release@v2
+        with:
+          draft: true       # matches your "promote manually" workflow
+          files: artifacts/**
+          fail_on_unmatched_files: true
