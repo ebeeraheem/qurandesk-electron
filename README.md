@@ -1,76 +1,111 @@
 # QuranDesk
 
 QuranDesk is an offline-first desktop player for complete Qur'an recitations. It downloads
-surahs for local playback and runs on Windows, macOS, and Linux using Electron, React,
-TypeScript, Zustand, Tailwind CSS, and SQLite.
+surahs for local playback and runs on Windows, macOS, and Linux.
 
-## Product Behavior
+Built with Electron, React, TypeScript, Zustand, Tailwind CSS v4, and `better-sqlite3`.
 
-- The catalog is cached for offline browsing.
-- Playback uses downloaded audio only. Selecting a missing surah offers download-and-play.
-- Explicit surah requests, retries, and playback-needed downloads are prioritized ahead of
+## Features
+
+- **Offline-first.** The reciter catalog is cached for offline browsing, and playback uses
+  only audio already downloaded to the device.
+- **Prioritized downloads.** A persistent SQLite queue with three worker slots streams atomic
+  downloads. Explicit surah requests, retries, and playback-needed downloads jump ahead of
   bulk reciter downloads.
-- Sequential playback can stop at a missing surah or auto-download it before continuing.
-- The Downloads page separates active work, failures, and reciters with audio on device.
-- Delete-surah, delete-reciter, and delete-all actions require confirmation.
-- Settings can export a privacy-safe diagnostics JSON report. Raw logs and local paths are not
-  exposed in the UI.
-- Updates check and download silently on launch and every six hours. A banner appears only
-  when an update is ready to restart; ignored updates install on normal quit.
+- **Sequential playback.** Previous/next, seek, playback speed, repeat-one, and position
+  restore. Reaching a missing surah either stops or auto-downloads it, per the Auto-download
+  setting. Press <kbd>Space</kbd> to toggle play/pause.
+- **Managed library.** The Downloads page separates active work, failures, and reciters with
+  audio on device. Refresh Library reconciles SQLite against the filesystem. Delete actions
+  require confirmation.
+- **Silent auto-updates.** Updates check and download on launch and every six hours. A banner
+  appears only when an update is ready to restart; ignored updates install on the next quit.
+- **Privacy-safe diagnostics.** Settings › Support exports a JSON report that redacts URLs,
+  credentials, secrets, and local paths.
 
-See [TODOS.md](./TODOS.md) for the shipped feature summary and remaining release decisions.
+## Getting started
 
-## Develop
-
-Use Node.js 22 and npm.
+Requires **Node.js 22** and npm.
 
 ```sh
 npm install
 npm run dev
-npm run typecheck
-npm run lint
-npm run build
 ```
 
-Set the catalog URL in `.env`:
+Set the catalog URL in `.env` (copy `.env.example` as a starting point; never commit `.env`):
 
 ```sh
 MAIN_VITE_MANIFEST_URL=https://your-host/reciters.json
 ```
 
-Copy `.env.example` as a starting point. Do not commit `.env`.
-
-## Build And Package
+## Development
 
 ```sh
-npm run icons        # regenerate platform icons from logo.svg
-npm run build        # type-check and compile main, preload, and renderer
-npm run build:unpack # create an unpacked local application
+npm run dev          # Electron dev window with HMR
+npm run typecheck    # node + renderer TypeScript checks
+npm run lint         # ESLint
+npm run format       # Prettier
+npm run build        # typecheck, then compile main, preload, and renderer
+npm run build:unpack # build and produce a local unpacked app for smoke testing
+```
+
+There is no automated test suite. For normal changes run `typecheck` and `lint`; run `build`
+for cross-boundary, build-config, or release-relevant changes. See [AGENTS.md](./AGENTS.md)
+for architecture, IPC contracts, and coding conventions.
+
+## Building installers
+
+```sh
+npm run icons        # regenerate platform icons from src/renderer/src/assets/logo.svg
 npm run build:win    # Windows NSIS installer, x64
 npm run build:mac    # macOS DMG + ZIP, arm64
 npm run build:linux  # Linux AppImage + deb
 ```
 
-macOS local builds skip notarization. CI enables notarization for tagged releases. Windows
-builds are unsigned unless signing credentials are provided.
+macOS local builds skip notarization; CI notarizes tagged releases. Windows builds are
+unsigned unless signing credentials are provided.
 
-## Release Flow
+## Releasing
 
-1. Bump the version in `package.json`.
-2. Run `npm run typecheck`, `npm run lint`, `npm run build`, and `npm run build:unpack`.
-3. Exercise the release smoke matrix in [MOBILE_PARITY_IMPLEMENTATION_PLAN.md](./MOBILE_PARITY_IMPLEMENTATION_PLAN.md).
-4. Push a `v*` tag.
-5. Verify the draft GitHub Release artifacts before publishing it.
+Releases are **tag-driven**: pushing a `v*` tag triggers `.github/workflows/release.yml`,
+which builds macOS arm64, Windows x64, and Linux packages and publishes a single **draft**
+GitHub Release. Published releases are consumed by `electron-updater`.
 
-The release workflow builds macOS arm64, Windows x64, and Linux packages. Published releases
-are consumed by `electron-updater`.
+> **Important:** `electron-builder` reads the version from `package.json`, **not** from the
+> git tag — it names every asset and writes the auto-updater's `latest*.yml` from it. The tag
+> and `package.json` must agree, or the build ships assets carrying the wrong version and
+> auto-update breaks. CI enforces this with a guard step that fails the release on a mismatch.
 
-Required release secrets:
+Use `npm version` so the bump, commit, and tag are always in sync:
+
+```sh
+# 1. Ensure main is clean and green.
+git checkout main && git pull
+npm run typecheck && npm run lint && npm run build:unpack
+
+# 2. Bump package.json, commit, and create the matching tag in one step.
+#    Pass the explicit version to release.
+npm version x.y.z -m "release: v%s"
+
+# 3. Push the commit and the tag.
+git push --follow-tags
+```
+
+Then:
+
+4. Watch the **Release** workflow succeed for all three OSes.
+5. Open the generated **draft** release, verify every asset is named with the new version and
+   the `latest*.yml` files are present, then publish it.
+
+Never create a `v*` tag by hand without bumping `package.json` first — that is exactly what
+the guard step prevents.
+
+### Release secrets
 
 - `MAIN_VITE_MANIFEST_URL`
-- `MAC_CERT_BASE64`, `MAC_CERT_PASSWORD`, `APPLE_ID`, `APPLE_APP_SPECIFIC_PASSWORD`, and
-  `APPLE_TEAM_ID` for signed/notarized macOS releases
-- `WIN_CSC_LINK` and `WIN_CSC_KEY_PASSWORD` when Windows signing is enabled
+- `MAC_CERT_BASE64`, `MAC_CERT_PASSWORD`, `APPLE_ID`, `APPLE_APP_SPECIFIC_PASSWORD`,
+  `APPLE_TEAM_ID` — signed/notarized macOS releases
+- `WIN_CSC_LINK`, `WIN_CSC_KEY_PASSWORD` — Windows signing (optional)
 
 ## Architecture
 
@@ -82,15 +117,11 @@ src/
   shared/     IPC types/constants and bundled surah metadata
 ```
 
-- SQLite is the source of truth for downloads and the persistent queue.
-- The filesystem is reconciled into SQLite at startup and through Refresh Library.
+- SQLite is the source of truth for downloads and the persistent queue; the filesystem is
+  reconciled into it at startup and via Refresh Library.
 - Downloaded audio and cached photos are served through the controlled `app://` protocol.
 - The main process owns structured diagnostics, native save dialogs, and automatic updates.
-- The renderer owns presentation and one hidden `<audio>` element.
+- The renderer owns presentation and a single hidden `<audio>` element
+  (`components/AudioEngine.tsx`; imperative playback logic lives in `audioEngine.ts`).
 
-## Diagnostics
-
-Settings > Support > Export diagnostics opens a native save dialog for a JSON report containing
-app/catalog/settings state, aggregate download/storage/update state, and recent sanitized
-errors. The exporter redacts URLs, credentials, secrets, and local paths and bounds retained
-diagnostic size.
+See [AGENTS.md](./AGENTS.md) for the full IPC contract, security boundaries, and conventions.

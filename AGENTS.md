@@ -15,8 +15,7 @@ with Electron, React, TypeScript, Tailwind CSS, Zustand, and `better-sqlite3`.
     Node-only and DOM-only imports.
 - `out/` and `dist/` are generated build/package output. Do not edit them.
 
-Read `README.md` for setup, packaging, environment variables, and release details. Read
-`TODOS.md` when a change relates to project phases or planned features.
+Read `README.md` for setup, packaging, environment variables, and the release flow.
 
 ## Common Commands
 

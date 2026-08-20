@@ -25,6 +25,18 @@ jobs:
         with:
           node-version: 22
           cache: npm
+      # electron-builder names artifacts and update metadata from package.json,
+      # not the tag. Fail loudly if they disagree so we never ship a v-tag whose
+      # assets carry the previous version. Fix with `npm version` before tagging.
+      - name: Verify tag matches package.json version
+        shell: bash
+        run: |
+          PKG=$(node -p "require('./package.json').version")
+          TAG=${GITHUB_REF_NAME#v}
+          if [ "$PKG" != "$TAG" ]; then
+            echo "::error::Tag $GITHUB_REF_NAME does not match package.json version $PKG. Run 'npm version' before tagging."
+            exit 1
+          fi
       - name: Install dependencies
         run: npm ci
       - name: Compile (typecheck + vite build)

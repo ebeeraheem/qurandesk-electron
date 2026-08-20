@@ -8,7 +8,7 @@ files:
   - '!src/*'
   - '!scripts/*'
   - '!electron.vite.config.{js,ts,mjs,cjs}'
-  - '!{.eslintcache,eslint.config.mjs,.prettierignore,.prettierrc.yaml,dev-app-update.yml,AGENTS.md,CHANGELOG.md,MOBILE_PARITY_IMPLEMENTATION_PLAN.md,README.md,TODOS.md}'
+  - '!{.eslintcache,eslint.config.mjs,.prettierignore,.prettierrc.yaml,dev-app-update.yml,AGENTS.md,CHANGELOG.md,README.md}'
   - '!{.env,.env.*,.npmrc,pnpm-lock.yaml}'
   - '!{tsconfig.json,tsconfig.node.json,tsconfig.web.json}'
 
